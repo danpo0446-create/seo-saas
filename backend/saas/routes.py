@@ -227,6 +227,133 @@ async def get_checkout_status(session_id: str, user: dict = Depends(get_current_
         raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
 
 
+# ============ BILLING PORTAL ============
+
+@saas_router.post("/billing-portal", response_model=BillingPortalResponse)
+async def create_billing_portal(request: BillingPortalRequest, user: dict = Depends(get_current_user_saas)):
+    """Create Stripe billing portal session for subscription management"""
+    db = get_db()
+    
+    # Get user's subscription
+    sub = await db.subscriptions.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not sub or not sub.get("stripe_customer_id"):
+        raise HTTPException(status_code=400, detail="Nu ai o subscripție activă cu Stripe")
+    
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    import stripe
+    stripe.api_key = stripe_api_key
+    
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=sub["stripe_customer_id"],
+            return_url=f"{request.origin_url}/app/billing"
+        )
+        return BillingPortalResponse(url=session.url)
+    except Exception as e:
+        logging.error(f"[STRIPE] Billing portal error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create billing portal: {str(e)}")
+
+
+# ============ ANALYTICS ROUTES ============
+
+@saas_router.get("/analytics/overview")
+async def get_analytics_overview(user: dict = Depends(get_current_user_saas)):
+    """Get analytics overview for dashboard"""
+    db = get_db()
+    from datetime import timedelta
+    
+    # Get date ranges
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+    seven_days_ago = now - timedelta(days=7)
+    
+    # Get subscription
+    sub = await db.subscriptions.find_one({"user_id": user["id"]}, {"_id": 0})
+    
+    # Count articles
+    total_articles = await db.articles.count_documents({"user_id": user["id"]})
+    articles_this_month = await db.articles.count_documents({
+        "user_id": user["id"],
+        "created_at": {"$gte": thirty_days_ago.isoformat()}
+    })
+    articles_this_week = await db.articles.count_documents({
+        "user_id": user["id"],
+        "created_at": {"$gte": seven_days_ago.isoformat()}
+    })
+    
+    # Count published articles
+    published_articles = await db.articles.count_documents({
+        "user_id": user["id"],
+        "status": "published"
+    })
+    
+    # Count sites
+    total_sites = await db.wordpress_configs.count_documents({"user_id": user["id"]})
+    
+    # Count keywords
+    total_keywords = await db.keywords.count_documents({"user_id": user["id"]})
+    
+    # Count backlinks
+    total_backlinks = await db.backlinks.count_documents({"user_id": user["id"]})
+    
+    # Get scheduled articles
+    scheduled_articles = await db.articles.count_documents({
+        "user_id": user["id"],
+        "status": "scheduled"
+    })
+    
+    # Calculate cost per article (based on plan)
+    plan_cost = {
+        "free": 0, "starter": 19, "pro": 49, "agency": 99, "enterprise": 199
+    }.get(sub.get("plan", "free"), 0)
+    
+    cost_per_article = 0
+    if articles_this_month > 0 and plan_cost > 0:
+        cost_per_article = round(plan_cost / articles_this_month, 2)
+    
+    # Estimate value (average article worth ~€5-20 in SEO value)
+    estimated_value = total_articles * 12  # €12 average estimated value per article
+    roi_percentage = 0
+    if plan_cost > 0:
+        monthly_value = articles_this_month * 12
+        roi_percentage = round(((monthly_value - plan_cost) / plan_cost) * 100, 1) if plan_cost > 0 else 0
+    
+    return {
+        "articles": {
+            "total": total_articles,
+            "this_month": articles_this_month,
+            "this_week": articles_this_week,
+            "published": published_articles,
+            "scheduled": scheduled_articles
+        },
+        "sites": {
+            "total": total_sites,
+            "limit": sub.get("sites_limit", 1) if sub else 1
+        },
+        "keywords": {
+            "total": total_keywords
+        },
+        "backlinks": {
+            "total": total_backlinks
+        },
+        "financial": {
+            "plan_cost": plan_cost,
+            "cost_per_article": cost_per_article,
+            "estimated_value": estimated_value,
+            "roi_percentage": roi_percentage
+        },
+        "subscription": {
+            "plan": sub.get("plan", "free") if sub else "free",
+            "status": sub.get("status", "expired") if sub else "expired",
+            "articles_used": sub.get("articles_used_this_month", 0) if sub else 0,
+            "articles_limit": sub.get("articles_limit", 0) if sub else 0
+        }
+    }
+
+
 # ============ BYOAK ROUTES ============
 
 @saas_router.get("/api-keys", response_model=UserApiKeysResponse)

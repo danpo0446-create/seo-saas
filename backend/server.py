@@ -532,6 +532,10 @@ async def register(user: UserCreate):
     subscription_service = SubscriptionService(db)
     await subscription_service.create_trial_subscription(user_id)
     
+    # Send welcome email (async, non-blocking)
+    from saas.email_service import email_service
+    asyncio.create_task(email_service.send_welcome_email(user.email, user.name))
+    
     token = create_token(user_id)
     return {"token": token, "user": {"id": user_id, "email": user.email, "name": user.name}}
 
@@ -7439,6 +7443,76 @@ async def startup_event():
         replace_existing=True
     )
     logging.info("Scheduled weekly SEO reports")
+    
+    # Schedule trial expiration reminders (daily at 10 AM)
+    scheduler.add_job(
+        check_trial_expirations,
+        CronTrigger(hour=10, minute=0, timezone=ROMANIA_TZ),
+        id="trial_expiration_check",
+        replace_existing=True
+    )
+    logging.info("Scheduled trial expiration reminders")
+
+async def check_trial_expirations():
+    """Check for expiring trials and send reminders"""
+    from saas.email_service import email_service
+    from datetime import timedelta
+    
+    logging.info("[TRIAL] Checking for expiring trials...")
+    
+    now = datetime.now(timezone.utc)
+    
+    # Find trials expiring in 2 days
+    two_days_later = now + timedelta(days=2)
+    one_day_later = now + timedelta(days=1)
+    
+    # Get trials that expire in ~2 days (reminder)
+    expiring_trials = await db.subscriptions.find({
+        "status": "trialing",
+        "trial_ends_at": {
+            "$gte": one_day_later.isoformat(),
+            "$lte": two_days_later.isoformat()
+        }
+    }, {"_id": 0}).to_list(1000)
+    
+    for sub in expiring_trials:
+        user = await db.users.find_one({"id": sub["user_id"]}, {"_id": 0})
+        if user:
+            # Calculate days left
+            trial_end = datetime.fromisoformat(sub["trial_ends_at"].replace("Z", "+00:00"))
+            days_left = max(1, (trial_end - now).days)
+            
+            # Get usage stats
+            articles_used = sub.get("articles_used_this_month", 0)
+            sites_count = await db.wordpress_configs.count_documents({"user_id": sub["user_id"]})
+            
+            await email_service.send_trial_reminder(
+                user["email"],
+                user.get("name", "User"),
+                days_left,
+                articles_used,
+                sites_count
+            )
+            logging.info(f"[TRIAL] Sent reminder to {user['email']} ({days_left} days left)")
+    
+    # Find and expire old trials
+    expired_trials = await db.subscriptions.find({
+        "status": "trialing",
+        "trial_ends_at": {"$lt": now.isoformat()}
+    }, {"_id": 0}).to_list(1000)
+    
+    for sub in expired_trials:
+        await db.subscriptions.update_one(
+            {"user_id": sub["user_id"]},
+            {"$set": {"status": "expired", "updated_at": now.isoformat()}}
+        )
+        
+        user = await db.users.find_one({"id": sub["user_id"]}, {"_id": 0})
+        if user:
+            await email_service.send_trial_expired(user["email"], user.get("name", "User"))
+            logging.info(f"[TRIAL] Trial expired for {user['email']}")
+    
+    logging.info(f"[TRIAL] Processed {len(expiring_trials)} reminders, {len(expired_trials)} expirations")
 
 async def send_weekly_seo_reports():
     """Send weekly SEO performance reports to all users"""

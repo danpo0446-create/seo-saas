@@ -135,6 +135,23 @@ const BillingPage = () => {
     }
   };
 
+  const handleBillingPortal = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(`${API}/saas/billing-portal`, {
+        origin_url: window.location.origin
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Redirect to Stripe billing portal
+      window.location.href = response.data.url;
+    } catch (error) {
+      console.error("Billing portal error:", error);
+      toast.error("Nu ai o subscripție activă cu Stripe. Alege un plan mai întâi.");
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       active: { label: "Activ", variant: "default", className: "bg-[#00E676] text-black" },
@@ -330,11 +347,21 @@ const BillingPage = () => {
                     Upgrade Plan
                   </Button>
                 </Link>
-                <Button variant="outline" className="border-[#262626] hover:bg-[#171717] justify-start" disabled>
+                <Button 
+                  variant="outline" 
+                  className="border-[#262626] hover:bg-[#171717] justify-start" 
+                  onClick={handleBillingPortal}
+                  disabled={!subscription?.stripe_customer_id}
+                >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Portal Facturare
                 </Button>
-                <Button variant="outline" className="border-[#262626] hover:bg-[#171717] justify-start text-red-400 hover:text-red-400" disabled>
+                <Button 
+                  variant="outline" 
+                  className="border-[#262626] hover:bg-[#171717] justify-start text-red-400 hover:text-red-400" 
+                  onClick={handleBillingPortal}
+                  disabled={!subscription?.stripe_customer_id}
+                >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Anulează Subscripția
                 </Button>

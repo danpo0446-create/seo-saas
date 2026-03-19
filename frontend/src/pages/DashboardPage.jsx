@@ -31,8 +31,10 @@ import {
   Bot,
   Sparkles,
   Clock,
-  Settings2
+  Settings2,
+  BarChart3
 } from 'lucide-react';
+import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import { 
   AreaChart, 
   Area, 
@@ -312,13 +314,16 @@ export default function DashboardPage() {
         </div>
         <Button 
           className="bg-primary text-primary-foreground hover:bg-primary/90 neon-glow-hover"
-          onClick={() => navigate('/articles/new')}
+          onClick={() => navigate('/app/articles/new')}
           data-testid="new-article-button"
         >
           <PlusCircle className="w-4 h-4 mr-2" />
           Articol Nou
         </Button>
       </div>
+
+      {/* Analytics ROI Dashboard */}
+      <AnalyticsDashboard />
 
       {/* Quota Progress */}
       <Card className="bg-card border-border">
