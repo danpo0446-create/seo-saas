@@ -7452,6 +7452,26 @@ async def startup_event():
         replace_existing=True
     )
     logging.info("Scheduled trial expiration reminders")
+    
+    # Schedule monthly usage reset (1st of each month at 00:05 AM)
+    scheduler.add_job(
+        reset_monthly_usage,
+        CronTrigger(day=1, hour=0, minute=5, timezone=ROMANIA_TZ),
+        id="monthly_usage_reset",
+        replace_existing=True
+    )
+    logging.info("Scheduled monthly usage reset")
+
+async def reset_monthly_usage():
+    """Reset monthly article usage for all subscriptions on 1st of month"""
+    logging.info("[USAGE] Resetting monthly article usage for all users...")
+    
+    result = await db.subscriptions.update_many(
+        {},
+        {"$set": {"articles_used_this_month": 0}}
+    )
+    
+    logging.info(f"[USAGE] Reset {result.modified_count} subscriptions")
 
 async def check_trial_expirations():
     """Check for expiring trials and send reminders"""
