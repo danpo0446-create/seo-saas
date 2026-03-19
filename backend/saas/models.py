@@ -61,6 +61,7 @@ class UserApiKeysResponse(BaseModel):
 class CreateCheckoutRequest(BaseModel):
     plan: str
     origin_url: str
+    billing_period: str = "monthly"  # "monthly" or "annual"
 
 class CheckoutResponse(BaseModel):
     url: str
@@ -71,6 +72,20 @@ class BillingPortalRequest(BaseModel):
 
 class BillingPortalResponse(BaseModel):
     url: str
+
+# Invoice Models
+class InvoiceResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    invoice_number: str
+    user_id: str
+    plan_name: str
+    billing_period: str
+    amount: float
+    currency: str
+    status: str
+    created_at: str
+    pdf_generated: bool = False
 
 # Payment Transaction Model
 class PaymentTransaction(BaseModel):

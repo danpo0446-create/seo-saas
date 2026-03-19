@@ -54,7 +54,8 @@ const PricingPage = () => {
       const token = localStorage.getItem("token");
       const response = await axios.post(`${API}/saas/checkout`, {
         plan: planId,
-        origin_url: window.location.origin
+        origin_url: window.location.origin,
+        billing_period: annual ? "annual" : "monthly"
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -75,6 +76,7 @@ const PricingPage = () => {
       name: "Starter",
       description: "Perfect pentru bloggeri și site-uri mici",
       price: 19,
+      priceAnnual: 182,
       icon: <Sparkles className="w-6 h-6" />,
       color: "from-blue-500 to-cyan-500",
       features: {
@@ -97,6 +99,7 @@ const PricingPage = () => {
       name: "Pro",
       description: "Ideal pentru freelanceri și afaceri în creștere",
       price: 49,
+      priceAnnual: 470,
       popular: true,
       icon: <Crown className="w-6 h-6" />,
       color: "from-[#00E676] to-emerald-400",
@@ -120,6 +123,7 @@ const PricingPage = () => {
       name: "Agency",
       description: "Pentru agenții și echipe mari",
       price: 99,
+      priceAnnual: 950,
       icon: <Building2 className="w-6 h-6" />,
       color: "from-purple-500 to-pink-500",
       features: {
@@ -142,6 +146,7 @@ const PricingPage = () => {
       name: "Enterprise",
       description: "Soluție completă fără limite",
       price: 199,
+      priceAnnual: 1910,
       icon: <Rocket className="w-6 h-6" />,
       color: "from-orange-500 to-red-500",
       features: {
@@ -160,6 +165,9 @@ const PricingPage = () => {
       }
     }
   ];
+
+  // Calculate monthly equivalent for annual
+  const getMonthlyEquivalent = (annualPrice) => Math.round(annualPrice / 12);
 
   const featureList = [
     { key: "sites", label: "Site-uri WordPress", icon: <Globe className="w-4 h-4" /> },
@@ -241,6 +249,20 @@ const PricingPage = () => {
               {currentPlan.status === "trialing" && ` (Trial - ${currentPlan.days_remaining} zile rămase)`}
             </Badge>
           )}
+          
+          {/* Annual/Monthly Toggle */}
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <span className={`text-sm ${!annual ? 'text-white font-medium' : 'text-[#71717A]'}`}>Lunar</span>
+            <Switch 
+              checked={annual} 
+              onCheckedChange={setAnnual}
+              className="data-[state=checked]:bg-[#00E676]"
+            />
+            <span className={`text-sm ${annual ? 'text-white font-medium' : 'text-[#71717A]'}`}>
+              Anual
+              <Badge className="ml-2 bg-[#00E676] text-black text-xs">-20%</Badge>
+            </span>
+          </div>
         </div>
       </section>
 
@@ -273,8 +295,21 @@ const PricingPage = () => {
                   <CardTitle className="text-white text-2xl">{plan.name}</CardTitle>
                   <CardDescription className="text-[#71717A]">{plan.description}</CardDescription>
                   <div className="mt-4">
-                    <span className="text-5xl font-bold text-white">€{plan.price}</span>
-                    <span className="text-[#71717A]">/lună</span>
+                    {annual ? (
+                      <>
+                        <span className="text-5xl font-bold text-white">€{getMonthlyEquivalent(plan.priceAnnual)}</span>
+                        <span className="text-[#71717A]">/lună</span>
+                        <div className="mt-1">
+                          <span className="text-sm text-[#525252] line-through">€{plan.price * 12}/an</span>
+                          <span className="text-sm text-[#00E676] ml-2">€{plan.priceAnnual}/an</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-5xl font-bold text-white">€{plan.price}</span>
+                        <span className="text-[#71717A]">/lună</span>
+                      </>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6">

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   CreditCard, Package, Key, Check, AlertCircle, Loader2, 
   ExternalLink, Eye, EyeOff, Save, Trash2, Shield,
-  FileText, Globe, Calendar, Zap, ArrowUpRight
+  FileText, Globe, Calendar, Zap, ArrowUpRight, Download, Receipt
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ const BillingPage = () => {
   const [subscription, setSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
   const [apiKeys, setApiKeys] = useState(null);
+  const [invoices, setInvoices] = useState([]);
   const [showKeys, setShowKeys] = useState({});
   const [keyInputs, setKeyInputs] = useState({
     openai_key: "",
@@ -48,20 +49,47 @@ const BillingPage = () => {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [subRes, usageRes, keysRes] = await Promise.all([
+      const [subRes, usageRes, keysRes, invoicesRes] = await Promise.all([
         axios.get(`${API}/saas/subscription`, { headers }),
         axios.get(`${API}/saas/subscription/usage`, { headers }),
-        axios.get(`${API}/saas/api-keys`, { headers })
+        axios.get(`${API}/saas/api-keys`, { headers }),
+        axios.get(`${API}/saas/invoices`, { headers }).catch(() => ({ data: [] }))
       ]);
       
       setSubscription(subRes.data);
       setUsage(usageRes.data);
       setApiKeys(keysRes.data);
+      setInvoices(invoicesRes.data || []);
     } catch (error) {
       console.error("Error fetching billing data:", error);
       toast.error("Eroare la încărcarea datelor");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadInvoice = async (invoiceId, invoiceNumber) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API}/saas/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `factura-${invoiceNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("Factura a fost descărcată");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Eroare la descărcarea facturii");
     }
   };
 
@@ -228,6 +256,10 @@ const BillingPage = () => {
             <Package className="w-4 h-4 mr-2" />
             Subscripție
           </TabsTrigger>
+          <TabsTrigger value="invoices" className="data-[state=active]:bg-[#262626]">
+            <FileText className="w-4 h-4 mr-2" />
+            Facturi
+          </TabsTrigger>
           <TabsTrigger value="api-keys" className="data-[state=active]:bg-[#262626]">
             <Key className="w-4 h-4 mr-2" />
             Chei API (BYOAK)
@@ -366,6 +398,73 @@ const BillingPage = () => {
                   Anulează Subscripția
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Invoices Tab */}
+        <TabsContent value="invoices" className="space-y-6">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-[#00E676]" />
+                Istoric Facturi
+              </CardTitle>
+              <CardDescription className="text-[#71717A]">
+                Toate facturile tale pentru subscripțiile SEO Automation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoices.length === 0 ? (
+                <div className="text-center py-12 text-[#71717A]">
+                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Nu ai nicio factură încă.</p>
+                  <p className="text-sm mt-2">Facturile vor apărea aici după prima plată.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {invoices.map((invoice) => (
+                    <div 
+                      key={invoice.id}
+                      className="flex items-center justify-between p-4 bg-[#171717] rounded-lg border border-[#262626]"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-[#00E676]" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{invoice.invoice_number}</p>
+                          <p className="text-[#71717A] text-sm">
+                            {invoice.plan_name} • {invoice.billing_period === 'annual' ? 'Anual' : 'Lunar'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <p className="text-white font-medium">€{invoice.amount}</p>
+                          <p className="text-[#71717A] text-sm">
+                            {new Date(invoice.created_at).toLocaleDateString('ro-RO')}
+                          </p>
+                        </div>
+                        <Badge className={invoice.status === 'paid' ? 'bg-[#00E676]/10 text-[#00E676]' : 'bg-yellow-500/10 text-yellow-500'}>
+                          {invoice.status === 'paid' ? 'Plătită' : invoice.status}
+                        </Badge>
+                        {invoice.pdf_generated && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#262626] hover:bg-[#262626]"
+                            onClick={() => downloadInvoice(invoice.id, invoice.invoice_number)}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            PDF
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

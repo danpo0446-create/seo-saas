@@ -3,12 +3,16 @@ Subscription Plans Configuration for SEO Automation SaaS
 """
 from typing import Dict, Any
 
+# Annual discount percentage
+ANNUAL_DISCOUNT = 20  # 20% discount for annual billing
+
 # Plan definitions
 PLANS: Dict[str, Dict[str, Any]] = {
     "free": {
         "id": "free",
         "name": "Free Trial",
         "price_eur": 0,
+        "price_annual_eur": 0,
         "sites_limit": 1,
         "articles_limit": 5,
         "features": [
@@ -17,12 +21,14 @@ PLANS: Dict[str, Dict[str, Any]] = {
             "Generare AI de bază",
             "Dashboard simplu"
         ],
-        "stripe_price_id": None
+        "stripe_price_id": None,
+        "stripe_price_id_annual": None
     },
     "starter": {
         "id": "starter",
         "name": "Starter",
         "price_eur": 19,
+        "price_annual_eur": 182,  # 19 * 12 * 0.8 = 182.4 rounded
         "sites_limit": 1,
         "articles_limit": 15,
         "features": [
@@ -33,12 +39,14 @@ PLANS: Dict[str, Dict[str, Any]] = {
             "Calendar editorial",
             "Publicare automată"
         ],
-        "stripe_price_id": "price_starter_monthly"
+        "stripe_price_id": "price_starter_monthly",
+        "stripe_price_id_annual": "price_starter_annual"
     },
     "pro": {
         "id": "pro",
         "name": "Pro",
         "price_eur": 49,
+        "price_annual_eur": 470,  # 49 * 12 * 0.8 = 470.4 rounded
         "sites_limit": 5,
         "articles_limit": 50,
         "features": [
@@ -50,12 +58,14 @@ PLANS: Dict[str, Dict[str, Any]] = {
             "Rapoarte avansate",
             "Email notificări"
         ],
-        "stripe_price_id": "price_pro_monthly"
+        "stripe_price_id": "price_pro_monthly",
+        "stripe_price_id_annual": "price_pro_annual"
     },
     "agency": {
         "id": "agency",
         "name": "Agency",
         "price_eur": 99,
+        "price_annual_eur": 950,  # 99 * 12 * 0.8 = 950.4 rounded
         "sites_limit": 20,
         "articles_limit": 200,
         "features": [
@@ -68,12 +78,14 @@ PLANS: Dict[str, Dict[str, Any]] = {
             "Business Analysis AI",
             "Suport prioritar"
         ],
-        "stripe_price_id": "price_agency_monthly"
+        "stripe_price_id": "price_agency_monthly",
+        "stripe_price_id_annual": "price_agency_annual"
     },
     "enterprise": {
         "id": "enterprise",
         "name": "Enterprise",
         "price_eur": 199,
+        "price_annual_eur": 1910,  # 199 * 12 * 0.8 = 1910.4 rounded
         "sites_limit": -1,  # Unlimited
         "articles_limit": -1,  # Unlimited
         "features": [
@@ -85,7 +97,8 @@ PLANS: Dict[str, Dict[str, Any]] = {
             "Suport dedicat 24/7",
             "Training personalizat"
         ],
-        "stripe_price_id": "price_enterprise_monthly"
+        "stripe_price_id": "price_enterprise_monthly",
+        "stripe_price_id_annual": "price_enterprise_annual"
     }
 }
 

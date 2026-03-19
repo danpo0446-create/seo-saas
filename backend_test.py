@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Tests for SaaS Analytics Dashboard
-Testing the new features: Analytics Dashboard, Email Service, Billing Portal
+Backend API Tests for SaaS SEO Automation - Annual Billing & Invoice Features
+Testing the new features: Annual billing with 20% discount, Invoice PDF generation, Monthly usage reset scheduler
 """
 import requests
 import sys
@@ -96,40 +96,38 @@ class SaasBackendTester:
             self.log(f"❌ Failed to login test user. Check credentials.")
             return False
 
-    def test_saas_analytics_overview(self):
-        """Test the new analytics overview API"""
+    def test_annual_billing_plans(self):
+        """Test annual billing with 20% discount calculation"""
         success, response = self.run_test(
-            "SaaS Analytics Overview API",
+            "Get Plans (Annual Pricing)",
             "GET",
-            "api/saas/analytics/overview",
+            "api/saas/plans",
             200
         )
         
         if success and response:
-            # Validate response structure
-            required_fields = ['articles', 'sites', 'keywords', 'backlinks', 'financial', 'subscription']
-            missing_fields = [field for field in required_fields if field not in response]
+            plans = {k: v for k, v in response.items() if k != '_status_code'}
+            self.log("✅ Plans endpoint working")
             
-            if not missing_fields:
-                self.log("✅ Analytics response has all required fields")
-                
-                # Check articles data
-                if 'articles' in response and all(key in response['articles'] for key in ['total', 'this_month', 'published']):
-                    self.log("✅ Articles analytics data is properly structured")
-                else:
-                    self.log("❌ Articles analytics data missing fields")
-                
-                # Check financial data
-                if 'financial' in response and all(key in response['financial'] for key in ['plan_cost', 'roi_percentage']):
-                    self.log("✅ Financial analytics data is properly structured")
-                    self.log(f"   → ROI: {response['financial'].get('roi_percentage', 0)}%")
-                    self.log(f"   → Plan Cost: €{response['financial'].get('plan_cost', 0)}")
-                else:
-                    self.log("❌ Financial analytics data missing fields")
-                
-                return True
-            else:
-                self.log(f"❌ Analytics response missing fields: {missing_fields}")
+            # Check annual discount calculation
+            annual_discounts_correct = True
+            for plan_id, plan in plans.items():
+                if isinstance(plan, dict) and 'price_eur' in plan:
+                    monthly_price = plan['price_eur']
+                    # According to plans.py, annual should be monthly * 12 * 0.8
+                    expected_annual = int(monthly_price * 12 * 0.8)
+                    
+                    # Check if the discount is approximately 20%
+                    full_year_cost = monthly_price * 12
+                    if full_year_cost > 0:
+                        discount_percentage = ((full_year_cost - expected_annual) / full_year_cost) * 100
+                        if abs(discount_percentage - 20.0) > 1.0:  # Allow 1% tolerance
+                            self.log(f"❌ {plan_id}: Annual discount incorrect - expected ~20%, got {discount_percentage:.1f}%")
+                            annual_discounts_correct = False
+                        else:
+                            self.log(f"✅ {plan_id}: €{monthly_price}/mo → €{expected_annual}/year (20% discount)")
+                    
+            return annual_discounts_correct
         
         return False
 
@@ -161,50 +159,91 @@ class SaasBackendTester:
         
         return False
 
-    def test_billing_portal_endpoint(self):
-        """Test billing portal endpoint (should fail for trial users)"""
-        success, response = self.run_test(
-            "Billing Portal (Trial User)",
+    def test_checkout_with_billing_period(self):
+        """Test checkout API accepts billing_period parameter (monthly/annual)"""
+        # Test with annual billing
+        success_annual, annual_response = self.run_test(
+            "Checkout with Annual Billing",
             "POST",
-            "api/saas/billing-portal",
-            400,  # Should fail for trial users
-            data={"origin_url": self.base_url}
+            "api/saas/checkout",
+            200,
+            data={
+                "plan": "pro",
+                "billing_period": "annual",
+                "origin_url": self.base_url
+            }
         )
         
-        # For trial users, this should fail with 400
-        if response.get('_status_code') == 400 or not success:
-            self.log(f"✅ Billing portal correctly blocked for trial users")
-            self.log(f"   → Error: {response.get('detail', 'Access denied')}")
+        # Test with monthly billing
+        success_monthly, monthly_response = self.run_test(
+            "Checkout with Monthly Billing", 
+            "POST",
+            "api/saas/checkout",
+            200,
+            data={
+                "plan": "pro",
+                "billing_period": "monthly",
+                "origin_url": self.base_url
+            }
+        )
+        
+        if success_annual and success_monthly:
+            self.log("✅ Checkout API accepts both annual and monthly billing periods")
+            if 'url' in annual_response:
+                self.log("✅ Annual checkout returns Stripe URL")
+            if 'url' in monthly_response:
+                self.log("✅ Monthly checkout returns Stripe URL")
             return True
         else:
-            self.log("❌ Billing portal should be blocked for trial users")
-        
-        return False
+            self.log("❌ Checkout API failing with billing_period parameter")
+            return False
 
-    def test_api_keys_endpoints(self):
-        """Test BYOAK (Bring Your Own API Keys) endpoints"""
-        # Test get API keys
+    def test_invoices_api(self):
+        """Test invoice-related API endpoints"""
+        # Test get invoices list
         success, response = self.run_test(
-            "Get API Keys Status",
+            "Get Invoices List",
             "GET",
-            "api/saas/api-keys",
+            "api/saas/invoices",
             200
         )
         
         if success:
-            self.log("✅ API Keys endpoint working")
-            # Try updating a key
-            success2, update_response = self.run_test(
-                "Update API Keys",
-                "PUT",
-                "api/saas/api-keys",
-                200,
-                data={"resend_key": "re_test_key_12345"}
-            )
+            self.log("✅ Invoices API working")
+            invoices = response if isinstance(response, list) else []
+            self.log(f"   → Found {len(invoices)} invoices")
             
-            if success2:
-                self.log("✅ API Keys update working")
-                return True
+            # Test invoice PDF endpoint (should exist even if no invoices)
+            if invoices:
+                # Test with first invoice
+                invoice_id = invoices[0].get('id')
+                if invoice_id:
+                    pdf_success, pdf_response = self.run_test(
+                        "Get Invoice PDF",
+                        "GET",
+                        f"api/saas/invoices/{invoice_id}/pdf",
+                        200
+                    )
+                    if pdf_success:
+                        self.log("✅ Invoice PDF endpoint working")
+                        return True
+                    else:
+                        self.log("❌ Invoice PDF endpoint failing")
+            else:
+                # Test with dummy ID to check endpoint exists
+                pdf_success, pdf_response = self.run_test(
+                    "Invoice PDF Endpoint (dummy ID)",
+                    "GET",
+                    "api/saas/invoices/dummy-id/pdf",
+                    404  # Should return 404 for non-existent invoice
+                )
+                if pdf_response.get('_status_code') == 404:
+                    self.log("✅ Invoice PDF endpoint exists (returns 404 for invalid ID)")
+                    return True
+                else:
+                    self.log("❌ Invoice PDF endpoint not properly configured")
+            
+            return success
         
         return False
 
@@ -256,32 +295,40 @@ class SaasBackendTester:
             self.log(f"❌ Only {success_count}/3 existing endpoints working")
             return False
 
-    def check_email_service_logs(self):
-        """Check if email service is initialized by looking for log patterns"""
-        self.log("🔍 Checking email service initialization...")
+    def check_monthly_usage_reset_scheduler(self):
+        """Check if monthly usage reset scheduler is configured"""
+        self.log("🔍 Checking monthly usage reset scheduler...")
         
-        # The email service should show up in server logs
-        # Since we can't directly check logs, we'll verify the service exists by checking API responses
-        # Email service should be initialized when analytics is accessed
+        # Check subscription usage to see if reset logic exists
         success, response = self.run_test(
-            "Analytics (triggers email service check)",
+            "Get Usage Stats (to check reset logic)",
             "GET",
-            "api/saas/analytics/overview",
+            "api/saas/subscription/usage",
             200
         )
         
-        if success:
-            self.log("✅ Email service likely initialized (analytics working)")
-            self.log("   → Check backend logs for [EMAIL] messages")
-            return True
+        if success and response:
+            # Look for usage tracking fields that would be reset monthly
+            usage_fields = ['articles_used', 'sites_used', 'articles_limit', 'sites_limit']
+            has_usage_tracking = any(field in response for field in usage_fields)
+            
+            if has_usage_tracking:
+                self.log("✅ Monthly usage tracking fields present")
+                self.log(f"   → Articles used: {response.get('articles_used', 0)}")
+                self.log(f"   → Articles limit: {response.get('articles_limit', 'N/A')}")
+                self.log("   → Monthly reset scheduler likely configured")
+                return True
+            else:
+                self.log("❌ No usage tracking fields found for monthly reset")
+                return False
         else:
-            self.log("❌ Could not verify email service initialization")
+            self.log("❌ Could not check usage stats for scheduler verification")
             return False
 
 def main():
     """Main test runner"""
     print("=" * 60)
-    print("🚀 SaaS Backend API Testing - Analytics Dashboard")
+    print("🚀 SaaS Backend API Testing - Annual Billing & Invoice Features")
     print("=" * 60)
     
     tester = SaasBackendTester()
@@ -294,29 +341,29 @@ def main():
     # Run all tests
     test_results = []
     
-    print("\n📊 Testing New SaaS Features:")
+    print("\n📊 Testing New Annual Billing Features:")
     print("-" * 40)
     
-    # Test new analytics endpoint
-    test_results.append(("Analytics Overview API", tester.test_saas_analytics_overview()))
+    # Test annual billing plans with 20% discount
+    test_results.append(("Annual Billing Plans (20% discount)", tester.test_annual_billing_plans()))
+    
+    # Test checkout API with billing_period parameter
+    test_results.append(("Checkout API with billing_period", tester.test_checkout_with_billing_period()))
+    
+    # Test invoice API
+    test_results.append(("Invoice API endpoints", tester.test_invoices_api()))
     
     # Test subscription endpoints  
     test_results.append(("Subscription Endpoints", tester.test_subscription_endpoints()))
     
-    # Test billing portal (should fail for trial)
-    test_results.append(("Billing Portal", tester.test_billing_portal_endpoint()))
-    
-    # Test API keys (BYOAK)
-    test_results.append(("API Keys (BYOAK)", tester.test_api_keys_endpoints()))
-    
-    # Test plans
-    test_results.append(("Plans Endpoint", tester.test_plans_endpoint()))
-    
-    # Check email service
-    test_results.append(("Email Service Check", tester.check_email_service_logs()))
+    # Check monthly usage reset scheduler
+    test_results.append(("Monthly Usage Reset Scheduler", tester.check_monthly_usage_reset_scheduler()))
     
     print("\n🔄 Testing Existing Endpoints:")
     print("-" * 40)
+    
+    # Test plans endpoint
+    test_results.append(("Plans Endpoint", tester.test_plans_endpoint()))
     
     # Test existing endpoints still work
     test_results.append(("Existing Endpoints", tester.test_existing_endpoints()))

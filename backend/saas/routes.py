@@ -115,9 +115,13 @@ async def create_checkout_session(request: CreateCheckoutRequest, http_request: 
     if not stripe_api_key:
         raise HTTPException(status_code=500, detail="Stripe not configured")
     
+    # Determine price based on billing period
+    is_annual = request.billing_period == "annual"
+    amount = plan["price_annual_eur"] if is_annual else plan["price_eur"]
+    
     # Build URLs
     origin = request.origin_url.rstrip("/")
-    success_url = f"{origin}/billing?session_id={{CHECKOUT_SESSION_ID}}"
+    success_url = f"{origin}/app/billing?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin}/pricing"
     
     # Initialize Stripe
@@ -126,7 +130,7 @@ async def create_checkout_session(request: CreateCheckoutRequest, http_request: 
     
     # Create checkout session
     checkout_request = CheckoutSessionRequest(
-        amount=float(plan["price_eur"]),
+        amount=float(amount),
         currency="eur",
         success_url=success_url,
         cancel_url=cancel_url,
@@ -134,7 +138,8 @@ async def create_checkout_session(request: CreateCheckoutRequest, http_request: 
             "user_id": user["id"],
             "user_email": user["email"],
             "plan": request.plan,
-            "plan_name": plan["name"]
+            "plan_name": plan["name"],
+            "billing_period": request.billing_period
         }
     )
     
@@ -147,7 +152,8 @@ async def create_checkout_session(request: CreateCheckoutRequest, http_request: 
             "user_id": user["id"],
             "session_id": session.session_id,
             "plan": request.plan,
-            "amount": float(plan["price_eur"]),
+            "billing_period": request.billing_period,
+            "amount": float(amount),
             "currency": "eur",
             "status": "initiated",
             "payment_status": "pending",
@@ -383,3 +389,120 @@ async def validate_api_key(key_type: str, key: str, user: dict = Depends(get_cur
     service = ApiKeyService(db)
     is_valid = await service.validate_key(key_type, key)
     return {"valid": is_valid, "key_type": key_type}
+
+
+# ============ INVOICE ROUTES ============
+
+from .invoice_service import invoice_generator
+from .models import InvoiceResponse
+from fastapi.responses import Response
+
+@saas_router.get("/invoices")
+async def get_invoices(user: dict = Depends(get_current_user_saas)):
+    """Get all invoices for user"""
+    db = get_db()
+    invoices = await db.invoices.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return invoices
+
+@saas_router.get("/invoices/{invoice_id}")
+async def get_invoice(invoice_id: str, user: dict = Depends(get_current_user_saas)):
+    """Get a specific invoice"""
+    db = get_db()
+    invoice = await db.invoices.find_one(
+        {"id": invoice_id, "user_id": user["id"]},
+        {"_id": 0}
+    )
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return invoice
+
+@saas_router.get("/invoices/{invoice_id}/pdf")
+async def download_invoice_pdf(invoice_id: str, user: dict = Depends(get_current_user_saas)):
+    """Download invoice as PDF"""
+    db = get_db()
+    
+    # Get invoice
+    invoice = await db.invoices.find_one(
+        {"id": invoice_id, "user_id": user["id"]},
+        {"_id": 0}
+    )
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Get user info
+    user_data = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    
+    # Generate PDF
+    invoice_data = {
+        "invoice_number": invoice["invoice_number"],
+        "date": invoice["created_at"],
+        "customer_name": user_data.get("name", "Client"),
+        "customer_email": user_data.get("email", ""),
+        "plan_name": invoice["plan_name"],
+        "billing_period": invoice.get("billing_period", "monthly"),
+        "amount": invoice["amount"],
+        "currency": invoice.get("currency", "EUR")
+    }
+    
+    pdf_bytes = invoice_generator.generate_invoice(invoice_data)
+    
+    if not pdf_bytes:
+        raise HTTPException(status_code=500, detail="PDF generation not available")
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=factura-{invoice['invoice_number']}.pdf"
+        }
+    )
+
+@saas_router.post("/invoices/generate")
+async def generate_invoice_for_transaction(
+    transaction_id: str,
+    user: dict = Depends(get_current_user_saas)
+):
+    """Generate invoice for a paid transaction"""
+    db = get_db()
+    
+    # Get transaction
+    transaction = await db.payment_transactions.find_one(
+        {"id": transaction_id, "user_id": user["id"], "status": "paid"},
+        {"_id": 0}
+    )
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Paid transaction not found")
+    
+    # Check if invoice already exists
+    existing = await db.invoices.find_one(
+        {"user_id": user["id"], "metadata.transaction_id": transaction_id},
+        {"_id": 0}
+    )
+    if existing:
+        return existing
+    
+    # Get user info
+    user_data = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    
+    # Create invoice
+    invoice_data = {
+        "plan_name": transaction.get("metadata", {}).get("plan_name", transaction.get("plan")),
+        "billing_period": transaction.get("billing_period", "monthly"),
+        "amount": transaction["amount"],
+        "currency": transaction.get("currency", "EUR"),
+        "customer_name": user_data.get("name"),
+        "customer_email": user_data.get("email")
+    }
+    
+    invoice = await invoice_generator.save_invoice(db, user["id"], invoice_data)
+    
+    # Link invoice to transaction
+    await db.invoices.update_one(
+        {"id": invoice["id"]},
+        {"$set": {"metadata": {"transaction_id": transaction_id}}}
+    )
+    
+    return invoice
