@@ -30,24 +30,26 @@ import {
   Brain,
   FileSearch,
   SearchCheck,
-  BarChart3
+  BarChart3,
+  CreditCard
 } from 'lucide-react';
 
 const navItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/articles', icon: PenTool, label: 'Articole' },
-  { path: '/keywords', icon: Search, label: 'Cuvinte-cheie' },
-  { path: '/calendar', icon: Calendar, label: 'Calendar Editorial' },
-  { path: '/backlinks', icon: Link, label: 'Backlinks' },
-  { path: '/web2', icon: Share2, label: 'Web 2.0 Links' },
-  { path: '/wordpress', icon: Globe, label: 'Site-uri WordPress' },
-  { path: '/automation', icon: Bot, label: 'Automatizare' },
-  { path: '/reports', icon: BarChart3, label: 'Rapoarte' },
-  { path: '/monitor', icon: Activity, label: 'Monitorizare' },
-  { path: '/technical-audit', icon: FileSearch, label: 'Audit Tehnic' },
-  { path: '/business-analysis', icon: Brain, label: 'Analiză Business' },
-  { path: '/indexing', icon: SearchCheck, label: 'Indexare Google' },
-  { path: '/settings', icon: Settings, label: 'Setări' },
+  { path: '/app/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/app/articles', icon: PenTool, label: 'Articole' },
+  { path: '/app/keywords', icon: Search, label: 'Cuvinte-cheie' },
+  { path: '/app/calendar', icon: Calendar, label: 'Calendar Editorial' },
+  { path: '/app/backlinks', icon: Link, label: 'Backlinks' },
+  { path: '/app/web2', icon: Share2, label: 'Web 2.0 Links' },
+  { path: '/app/wordpress', icon: Globe, label: 'Site-uri WordPress' },
+  { path: '/app/automation', icon: Bot, label: 'Automatizare' },
+  { path: '/app/reports', icon: BarChart3, label: 'Rapoarte' },
+  { path: '/app/monitor', icon: Activity, label: 'Monitorizare' },
+  { path: '/app/technical-audit', icon: FileSearch, label: 'Audit Tehnic' },
+  { path: '/app/business-analysis', icon: Brain, label: 'Analiză Business' },
+  { path: '/app/indexing', icon: SearchCheck, label: 'Indexare Google' },
+  { path: '/app/billing', icon: CreditCard, label: 'Facturare' },
+  { path: '/app/settings', icon: Settings, label: 'Setări' },
 ];
 
 export const DashboardLayout = () => {
@@ -63,7 +65,7 @@ export const DashboardLayout = () => {
 
   const handleSiteChange = (siteId) => {
     if (siteId === 'add-new') {
-      navigate('/wordpress');
+      navigate('/app/wordpress');
     } else if (siteId === 'all') {
       selectSite(null);
     } else {

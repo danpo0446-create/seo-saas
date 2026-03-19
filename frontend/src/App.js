@@ -21,6 +21,9 @@ import TechnicalAuditPage from "@/pages/TechnicalAuditPage";
 import BusinessAnalysisPage from "@/pages/BusinessAnalysisPage";
 import IndexingPage from "@/pages/IndexingPage";
 import ReportsPage from "@/pages/ReportsPage";
+import LandingPage from "@/pages/LandingPage";
+import PricingPage from "@/pages/PricingPage";
+import BillingPage from "@/pages/BillingPage";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -68,18 +71,23 @@ function App() {
       <SiteProvider>
         <BrowserRouter>
           <Routes>
+            {/* Public Pages */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/login" element={
               <PublicRoute><LoginPage /></PublicRoute>
             } />
             <Route path="/register" element={
               <PublicRoute><RegisterPage /></PublicRoute>
             } />
-            <Route path="/" element={
+            
+            {/* Protected Dashboard */}
+            <Route path="/app" element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="articles" element={<ArticlesPage />} />
               <Route path="articles/new" element={<ArticleGeneratorPage />} />
@@ -95,7 +103,13 @@ function App() {
               <Route path="business-analysis" element={<BusinessAnalysisPage />} />
               <Route path="indexing" element={<IndexingPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="billing" element={<BillingPage />} />
             </Route>
+            
+            {/* Legacy routes redirect */}
+            <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+            <Route path="/articles/*" element={<Navigate to="/app/articles" replace />} />
+            <Route path="/billing" element={<Navigate to="/app/billing" replace />} />
           </Routes>
         </BrowserRouter>
         <Toaster position="top-right" theme="dark" />

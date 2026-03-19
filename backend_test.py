@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class SEOPlatformAPITester:
-    def __init__(self, base_url="https://seo-automation-ro-1.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://seo-automation-saas.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.token = None
         self.tests_run = 0
@@ -316,6 +316,120 @@ class SEOPlatformAPITester:
             data=settings_data
         )
         return success
+    
+    def test_saas_plans(self):
+        """Test SaaS plans endpoint"""
+        success, response = self.run_test(
+            "Get SaaS Plans",
+            "GET",
+            "saas/plans",
+            200
+        )
+        
+        if success:
+            # Check that all 4 plans are present with correct prices
+            expected_plans = ["starter", "pro", "agency", "enterprise"]
+            expected_prices = [19, 49, 99, 199]
+            
+            for i, plan_id in enumerate(expected_plans):
+                if plan_id in response:
+                    plan = response[plan_id]
+                    if plan.get("price_eur") == expected_prices[i]:
+                        print(f"✅ Plan {plan_id}: €{plan['price_eur']} - Correct")
+                    else:
+                        print(f"❌ Plan {plan_id}: Expected €{expected_prices[i]}, got €{plan.get('price_eur')}")
+                        return False
+                else:
+                    print(f"❌ Plan {plan_id} not found in response")
+                    return False
+        return success
+    
+    def test_saas_subscription(self):
+        """Test SaaS subscription endpoint - should create trial subscription"""
+        success, response = self.run_test(
+            "Get SaaS Subscription",
+            "GET",
+            "saas/subscription",
+            200
+        )
+        
+        if success:
+            # Should have trial status for new user
+            if response.get("status") == "trialing":
+                print(f"✅ Trial subscription created correctly")
+            else:
+                print(f"❌ Expected trialing status, got {response.get('status')}")
+        return success
+    
+    def test_saas_subscription_usage(self):
+        """Test SaaS subscription usage endpoint"""
+        success, response = self.run_test(
+            "Get SaaS Subscription Usage",
+            "GET",
+            "saas/subscription/usage",
+            200
+        )
+        
+        if success:
+            # Check for required usage fields
+            required_fields = ["plan", "plan_name", "status", "sites_limit", "articles_limit", "days_remaining"]
+            for field in required_fields:
+                if field not in response:
+                    print(f"❌ Missing required field: {field}")
+                    return False
+            
+            # Verify trial setup
+            if response.get("status") == "trialing" and response.get("days_remaining") is not None:
+                days_remaining = response.get("days_remaining")
+                if 0 <= days_remaining <= 7:
+                    print(f"✅ Trial setup correct: {days_remaining} days remaining")
+                else:
+                    print(f"❌ Invalid days remaining: {days_remaining}")
+                    return False
+        return success
+    
+    def test_saas_api_keys(self):
+        """Test BYOAK API keys endpoint"""
+        success, response = self.run_test(
+            "Get BYOAK API Keys Status",
+            "GET",
+            "saas/api-keys",
+            200
+        )
+        
+        if success:
+            # Check that keys status is returned
+            required_fields = ["has_openai_key", "has_gemini_key", "has_resend_key", "has_pexels_key"]
+            for field in required_fields:
+                if field not in response:
+                    print(f"❌ Missing required field: {field}")
+                    return False
+            print("✅ API keys status endpoint working")
+        return success
+    
+    def test_update_api_keys(self):
+        """Test updating BYOAK API keys"""
+        keys_data = {
+            "openai_key": "sk-test-key-1234567890abcdef",
+            "gemini_key": "AIza-test-gemini-key-1234567890"
+        }
+        
+        success, response = self.run_test(
+            "Update BYOAK API Keys",
+            "PUT",
+            "saas/api-keys",
+            200,
+            data=keys_data
+        )
+        
+        if success:
+            # Check that keys are marked as configured
+            if response.get("has_openai_key") and response.get("has_gemini_key"):
+                print("✅ API keys updated correctly")
+            else:
+                print(f"❌ Keys not marked as configured: {response}")
+                return False
+        return success
 
 def main():
     print("🚀 Starting SEO Automation Platform API Tests")
@@ -382,6 +496,15 @@ def main():
     print("-" * 30)
     tester.test_get_settings()
     tester.test_update_settings()
+    
+    # Test SaaS features
+    print("\n💰 SAAS TESTS")
+    print("-" * 30)
+    tester.test_saas_plans()
+    tester.test_saas_subscription()
+    tester.test_saas_subscription_usage()
+    tester.test_saas_api_keys()
+    tester.test_update_api_keys()
     
     # Print results
     print("\n" + "=" * 60)

@@ -54,6 +54,11 @@ from services.social_posting import (
 from woocommerce_service import get_woocommerce_service, get_products_for_article, WooCommerceService
 from google_trends_service import get_trending_topics_for_niche, score_keywords_by_trend, GoogleTrendsService
 
+# Import SaaS modules
+from saas.routes import saas_router
+from saas.subscription_service import SubscriptionService, ApiKeyService
+from saas.plans import get_plan, PLANS
+
 # Compatibility layer for old chat() function
 @dataclass
 class Message:
@@ -523,6 +528,10 @@ async def register(user: UserCreate):
     }
     await db.settings.insert_one(settings_doc)
     
+    # Create trial subscription for new user
+    subscription_service = SubscriptionService(db)
+    await subscription_service.create_trial_subscription(user_id)
+    
     token = create_token(user_id)
     return {"token": token, "user": {"id": user_id, "email": user.email, "name": user.name}}
 
@@ -596,6 +605,16 @@ def clean_html_content(content: str) -> str:
 
 @api_router.post("/articles/generate", response_model=ArticleResponse)
 async def generate_article(article: ArticleCreate, user: dict = Depends(get_current_user)):
+    # Check subscription limits
+    subscription_service = SubscriptionService(db)
+    can_generate = await subscription_service.check_article_limit(user["id"])
+    if not can_generate:
+        usage = await subscription_service.get_usage_stats(user["id"])
+        raise HTTPException(
+            status_code=402, 
+            detail=f"Ai atins limita de {usage['articles_limit']} articole/lună pentru planul {usage['plan_name']}. Upgradează pentru mai multe articole."
+        )
+    
     try:
         api_key = os.environ.get('EMERGENT_LLM_KEY')
         if not api_key:
@@ -731,6 +750,9 @@ Continuă ACUM:"""
             "products_count": products_count
         }
         await db.articles.insert_one(article_doc)
+        
+        # Increment article usage for subscription
+        await subscription_service.increment_article_usage(user["id"])
         
         return ArticleResponse(**article_doc)
     except Exception as e:
@@ -7204,8 +7226,11 @@ async def get_dashboard_all(site_id: Optional[str] = None, user: dict = Depends(
     
     return result
 
-# Include router
+# Include routers
 app.include_router(api_router)
+
+# Include SaaS router
+app.include_router(saas_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -7220,6 +7245,61 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# ============ STRIPE WEBHOOK ============
+from fastapi import Request
+
+@app.post("/api/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    from emergentintegrations.payments.stripe.checkout import StripeCheckout
+    
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+    
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature", "")
+        
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        logging.info(f"[STRIPE WEBHOOK] Event: {webhook_response.event_type}, Session: {webhook_response.session_id}")
+        
+        # Update transaction and subscription based on event
+        if webhook_response.payment_status == "paid":
+            transaction = await db.payment_transactions.find_one({"session_id": webhook_response.session_id})
+            if transaction and transaction.get("status") != "paid":
+                # Update transaction
+                await db.payment_transactions.update_one(
+                    {"session_id": webhook_response.session_id},
+                    {"$set": {
+                        "status": "paid",
+                        "payment_status": "paid",
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                # Upgrade subscription
+                user_id = transaction.get("user_id") or webhook_response.metadata.get("user_id")
+                plan = transaction.get("plan") or webhook_response.metadata.get("plan", "starter")
+                
+                if user_id:
+                    subscription_service = SubscriptionService(db)
+                    await subscription_service.upgrade_subscription(
+                        user_id=user_id,
+                        plan=plan,
+                        stripe_customer_id=webhook_response.metadata.get("customer_id"),
+                        stripe_subscription_id=webhook_response.session_id
+                    )
+                    logging.info(f"[STRIPE WEBHOOK] Upgraded user {user_id} to {plan}")
+        
+        return {"status": "success"}
+    except Exception as e:
+        logging.error(f"[STRIPE WEBHOOK] Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.on_event("startup")
 async def startup_event():
