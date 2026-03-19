@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: seo-backend
+    restart: always
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - CORS_ORIGINS=*
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: seo-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8001
+    depends_on:
+      - backend

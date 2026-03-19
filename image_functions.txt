@@ -1,0 +1,73 @@
+# COPIAZĂ TOT ACEST CONȚINUT
+# LIPEȘTE ÎN server.py ÎNAINTE DE LINIA: # ============ AUTOMATION SYSTEM ============
+
+# ============ IMAGE FUNCTIONS (Pexels) ============
+
+async def fetch_images_for_article(keywords: List[str], niche: str, count: int = 6) -> List[dict]:
+    images = []
+    search_terms = [niche] + keywords[:3]
+    async with httpx.AsyncClient() as client:
+        for term in search_terms:
+            if len(images) >= count:
+                break
+            try:
+                response = await client.get(
+                    "https://api.pexels.com/v1/search",
+                    headers={"Authorization": PEXELS_API_KEY},
+                    params={"query": term, "per_page": 3, "orientation": "landscape", "size": "large"},
+                    timeout=15
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    for photo in data.get("photos", []):
+                        if len(images) < count:
+                            images.append({
+                                "url": photo["src"]["large"],
+                                "url_medium": photo["src"]["medium"],
+                                "alt": photo.get("alt") or term.title(),
+                                "photographer": photo.get("photographer", "Pexels"),
+                                "source": "Pexels"
+                            })
+            except Exception as e:
+                logging.warning(f"Pexels error: {str(e)}")
+    return images
+
+async def upload_image_url_to_wp(config: dict, image_url: str, filename: str) -> tuple:
+    import requests
+    import base64 as b64
+    try:
+        async with httpx.AsyncClient() as client:
+            img_response = await client.get(image_url, timeout=30)
+            if img_response.status_code != 200:
+                return None, None
+            image_data = img_response.content
+        credentials = f"{config['username']}:{config['app_password']}"
+        token = b64.b64encode(credentials.encode()).decode()
+        response = requests.post(
+            f"{config['site_url']}/wp-json/wp/v2/media",
+            headers={"Authorization": f"Basic {token}", "Content-Disposition": f'attachment; filename="{filename}.jpg"', "Content-Type": "image/jpeg"},
+            data=image_data, timeout=60
+        )
+        if response.status_code in [200, 201]:
+            media_data = response.json()
+            return media_data.get("id"), media_data.get("source_url")
+    except Exception as e:
+        logging.error(f"WP upload error: {str(e)}")
+    return None, None
+
+def insert_images_into_content(content: str, images: List[dict], uploaded_urls: List[str]) -> str:
+    if not images or not uploaded_urls:
+        return content
+    h2_matches = list(re.finditer(r'(<h2[^>]*>.*?</h2>)', content, re.IGNORECASE | re.DOTALL))
+    if len(h2_matches) < 2:
+        return content
+    insert_positions = []
+    for i, match in enumerate(h2_matches[1:], 1):
+        next_p = content.find('</p>', match.end())
+        if next_p != -1 and i <= len(uploaded_urls):
+            insert_positions.append((next_p + 4, i - 1))
+    for pos, img_idx in reversed(insert_positions):
+        if img_idx < len(uploaded_urls) and img_idx < len(images):
+            img_html = f'<figure style="margin:30px 0;text-align:center;"><img src="{uploaded_urls[img_idx]}" alt="{images[img_idx]["alt"]}" style="max-width:100%;border-radius:8px;" loading="lazy"><figcaption style="font-size:12px;color:#666;">Foto: {images[img_idx]["photographer"]}</figcaption></figure>'
+            content = content[:pos] + img_html + content[pos:]
+    return content

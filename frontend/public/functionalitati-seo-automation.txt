@@ -1,0 +1,253 @@
+================================================================================
+                    SEO AUTOMATION PLATFORM - LISTA FUNCȚIONALITĂȚI
+                              Versiune: Martie 2026
+================================================================================
+
+================================================================================
+                              1. DASHBOARD PRINCIPAL
+================================================================================
+- Statistici generale: articole totale, publicate, draft-uri
+- Cotă lunară de articole cu progress bar
+- Statistici automatizare: articole săptămânale, total auto-generate
+- Grafic trafic zilnic (clicks & impressions)
+- Integrare Google Search Console cu date reale
+- Selector perioadă (7/28/90/180 zile)
+- Statistici per site
+
+================================================================================
+                              2. GESTIUNE ARTICOLE
+================================================================================
+- Listare articole cu filtrare per site
+- Status articole: published/draft
+- Vizualizare conținut complet
+- Editare articole
+- Ștergere articole
+- Publicare manuală pe WordPress
+- Informații SEO: word count, keyword density, scor SEO
+
+================================================================================
+                              3. CUVINTE-CHEIE (KEYWORDS)
+================================================================================
+- Adăugare manuală cuvinte-cheie
+- Generare automată cu AI bazat pe nișă
+- Import keywords din fișier
+- Asociere keywords cu site-uri
+- Tracking keyword performance
+- Sugestii keywords trending
+
+================================================================================
+                              4. CALENDAR EDITORIAL
+================================================================================
+- Vizualizare calendar lunar
+- Programare articole pentru date viitoare
+- Bifă verde pentru articole publicate
+- Status vizual: programat/publicat/draft
+- Integrare cu automatizarea
+
+================================================================================
+                              5. MANAGER BACKLINKS
+================================================================================
+- Căutare oportunități backlinks per nișă
+- Generare email-uri outreach cu AI
+- Sistem approve/reject email-uri
+- Tracking status outreach (pending/sent/approved/rejected)
+- Căutare backlinks pentru toate site-urile simultan
+- Diagnostic backlinks
+
+================================================================================
+                              6. WEB 2.0 LINKS
+================================================================================
+- Posting automat pe platforme Web 2.0
+- Integrare cu Medium, Blogger, Tumblr (în dezvoltare)
+- Tracking link-uri create
+
+================================================================================
+                              7. SITE-URI WORDPRESS
+================================================================================
+- Adăugare multiple site-uri WordPress
+- Testare conexiune API
+- Configurare per site:
+  * Nume site
+  * URL
+  * Username & Application Password
+  * Nișă
+  * Limbă articole (RO/EN)
+  * TON articole (nou!) - ex: "cald, empatic, profesional"
+  * Email notificări
+- Integrare WooCommerce (consumer key/secret)
+- Selector site activ în header
+
+================================================================================
+                              8. AUTOMATIZARE ARTICOLE
+================================================================================
+- Activare/dezactivare per site
+- Moduri: automatic / manual / scheduled
+- Setare oră publicare (fusul orar România)
+- Rotație automată între site-uri
+- Tipuri articole pe zile:
+  * Luni: Review produse
+  * Marți: Ghid/Tutorial
+  * Miercuri: Comparație produse
+  * Joi: Informativ/Educațional
+  * Vineri: Tips & Tricks
+  * Sâmbătă: Trend/Actualitate
+  * Duminică: Rezumat săptămânal
+
+SISTEM SCORING SUBIECTE:
+- +40 puncte: topic trending (Google Trends)
+- +15 puncte: match GSC opportunity (poziție 5-20, CTR < 3%)
+- +20 puncte: produs disponibil în catalog WooCommerce
+- -30 puncte: topic folosit în ultimele 30 zile
+- -20 puncte: topic semantic similar (90 zile cooldown)
+
+INTEGRĂRI AUTOMATIZARE:
+- Google Trends (pytrends) - topics trending
+- WooCommerce - link-uri produse în articole
+- GSC Opportunities - queries cu potențial
+- Pexels API - imagini pentru articole
+
+QA AUTOMAT:
+- Verificare word count (min. 800 cuvinte)
+- Verificare keyword density
+- Verificare link-uri interne
+- Scor SEO calculat automat
+
+RETRY & ALERTS:
+- 3 încercări cu exponential backoff (10s, 30s, 90s)
+- Email alertă la eșec job
+
+================================================================================
+                              9. RAPOARTE PERFORMANȚĂ
+================================================================================
+- Tab Săptămânal (ultimele 7 zile)
+- Tab Lunar (ultimele 30 zile)
+- Grafice vizuale:
+  * Area Chart - activitate zilnică
+  * Donut Pie Chart - distribuție tipuri articole
+  * Bar Chart - performanță per site
+  * Progress bars - metrici calitate
+- Statistici: total articole, publicate, cu produse, cu trending
+- Metrici calitate: scor SEO mediu, cuvinte medii
+- Rată publicare procentuală
+- Export rapoarte (în dezvoltare)
+
+================================================================================
+                              10. MONITORIZARE
+================================================================================
+- Status site-uri în timp real
+- Verificare disponibilitate
+- Alertă la probleme
+
+================================================================================
+                              11. AUDIT TEHNIC SEO
+================================================================================
+- Analiză tehnică site
+- Verificare meta tags
+- Verificare viteza încărcare
+- Verificare mobile-friendly
+- Recomandări optimizare
+
+================================================================================
+                              12. ANALIZĂ BUSINESS AI
+================================================================================
+- Analiză completă site cu AI
+- Auto-detectare nișă din configurare site
+- Recomandări strategice personalizate
+- Istoric analize salvat
+- Integrare GSC pentru date reale
+
+================================================================================
+                              13. INDEXARE GOOGLE
+================================================================================
+- Verificare status indexare URL-uri
+- Request indexare pentru pagini noi
+- Tracking indexare în timp
+
+================================================================================
+                              14. INTEGRĂRI SOCIAL MEDIA
+================================================================================
+FACEBOOK:
+- Conectare pagini Facebook
+- Posting automat articole
+- OAuth 2.0 authentication
+
+LINKEDIN:
+- Conectare profil LinkedIn
+- Posting automat articole
+- OAuth 2.0 cu OpenID Connect
+
+================================================================================
+                              15. GOOGLE SEARCH CONSOLE
+================================================================================
+- Conectare OAuth 2.0
+- Import date: clicks, impressions, CTR, poziție
+- Grafice trafic zilnic
+- Top queries & top pages
+- Selector site GSC
+- Selector perioadă analiză
+- Endpoint GSC Opportunities (queries cu potențial)
+
+================================================================================
+                              16. SETĂRI
+================================================================================
+- Profil utilizator
+- Schimbare parolă
+- Configurare notificări email
+- API keys management
+- Preferințe aplicație
+
+================================================================================
+                              17. FUNCȚIONALITĂȚI TEHNICE
+================================================================================
+- Autentificare JWT securizată
+- Caching pentru performanță (GSC, dashboard)
+- MongoDB indexes pentru query-uri rapide
+- Endpoint combinat /dashboard/all (optimizare)
+- Hot reload development
+- Docker deployment
+- Scheduler APScheduler pentru job-uri automate
+- Topics Log - tracking 90 zile pentru cooldown semantic
+- Recovery automată job-uri la restart server
+
+================================================================================
+                              18. NOTIFICĂRI EMAIL
+================================================================================
+- Notificare articol publicat
+- Notificare job eșuat
+- Rapoarte săptămânale automate
+- Rapoarte lunare automate
+- Provider: Resend API
+
+================================================================================
+                              TEHNOLOGII UTILIZATE
+================================================================================
+BACKEND:
+- Python 3.11+ cu FastAPI
+- MongoDB (Motor async driver)
+- APScheduler pentru job-uri
+- emergentintegrations pentru AI (Gemini)
+- pytrends pentru Google Trends
+- WooCommerce API
+- Resend pentru email-uri
+- OAuth 2.0 pentru GSC, Facebook, LinkedIn
+
+FRONTEND:
+- React 18+
+- Tailwind CSS
+- Shadcn/UI components
+- Recharts pentru grafice
+- Axios pentru API calls
+- React Router pentru navigare
+
+DEPLOYMENT:
+- Docker & Docker Compose
+- Nginx reverse proxy
+- Hostinger VPS
+
+================================================================================
+                              CONTACT & SUPPORT
+================================================================================
+Aplicație dezvoltată cu Emergent AI Platform
+https://emergentagent.com
+
+================================================================================
