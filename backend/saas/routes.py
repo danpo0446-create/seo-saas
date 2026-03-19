@@ -7,7 +7,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClient
+import jwt
 
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest, CheckoutSessionResponse, CheckoutStatusResponse
@@ -19,7 +21,10 @@ from .models import (
     UserApiKeysUpdate, UserApiKeysResponse, SubscriptionResponse, SubscriptionUsage
 )
 from .subscription_service import SubscriptionService, ApiKeyService
-from auth import get_current_user
+
+# JWT Config
+JWT_SECRET = os.environ.get('JWT_SECRET', 'seo-automation-secret-key-2024')
+JWT_ALGORITHM = "HS256"
 
 # Lazy database connection
 _client = None
@@ -33,6 +38,24 @@ def get_db():
         _client = AsyncIOMotorClient(mongo_url)
         _db = _client[os.environ.get('DB_NAME', 'seo_saas')]
     return _db
+
+# Security
+security = HTTPBearer()
+
+async def get_current_user_saas(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Auth dependency for SaaS routes"""
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        db = get_db()
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # Router
 saas_router = APIRouter(prefix="/api/saas", tags=["SaaS"])
@@ -62,7 +85,7 @@ async def get_plans():
 # ============ SUBSCRIPTION ROUTES ============
 
 @saas_router.get("/subscription", response_model=SubscriptionResponse)
-async def get_subscription(user: dict = Depends(get_current_user)):
+async def get_subscription(user: dict = Depends(get_current_user_saas)):
     """Get current user's subscription"""
     db = get_db()
     service = SubscriptionService(db)
@@ -70,7 +93,7 @@ async def get_subscription(user: dict = Depends(get_current_user)):
     return SubscriptionResponse(**sub)
 
 @saas_router.get("/subscription/usage", response_model=SubscriptionUsage)
-async def get_usage(user: dict = Depends(get_current_user)):
+async def get_usage(user: dict = Depends(get_current_user_saas)):
     """Get subscription usage statistics"""
     db = get_db()
     service = SubscriptionService(db)
@@ -81,7 +104,7 @@ async def get_usage(user: dict = Depends(get_current_user)):
 
 @saas_router.post("/checkout", response_model=CheckoutResponse)
 async def create_checkout_session(request: CreateCheckoutRequest, http_request: Request, 
-                                   user: dict = Depends(get_current_user)):
+                                   user: dict = Depends(get_current_user_saas)):
     """Create Stripe checkout session for subscription"""
     db = get_db()
     plan = get_plan(request.plan)
@@ -145,7 +168,7 @@ async def create_checkout_session(request: CreateCheckoutRequest, http_request: 
         raise HTTPException(status_code=500, detail=f"Failed to create checkout: {str(e)}")
 
 @saas_router.get("/checkout/status/{session_id}")
-async def get_checkout_status(session_id: str, user: dict = Depends(get_current_user)):
+async def get_checkout_status(session_id: str, user: dict = Depends(get_current_user_saas)):
     """Get checkout session status and update subscription if paid"""
     db = get_db()
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
@@ -207,14 +230,14 @@ async def get_checkout_status(session_id: str, user: dict = Depends(get_current_
 # ============ BYOAK ROUTES ============
 
 @saas_router.get("/api-keys", response_model=UserApiKeysResponse)
-async def get_api_keys(user: dict = Depends(get_current_user)):
+async def get_api_keys(user: dict = Depends(get_current_user_saas)):
     """Get user's API keys status (not the actual keys)"""
     db = get_db()
     service = ApiKeyService(db)
     return await service.get_user_keys(user["id"])
 
 @saas_router.put("/api-keys", response_model=UserApiKeysResponse)
-async def update_api_keys(keys: UserApiKeysUpdate, user: dict = Depends(get_current_user)):
+async def update_api_keys(keys: UserApiKeysUpdate, user: dict = Depends(get_current_user_saas)):
     """Update user's API keys"""
     db = get_db()
     service = ApiKeyService(db)
@@ -227,7 +250,7 @@ async def update_api_keys(keys: UserApiKeysUpdate, user: dict = Depends(get_curr
     )
 
 @saas_router.post("/api-keys/validate")
-async def validate_api_key(key_type: str, key: str, user: dict = Depends(get_current_user)):
+async def validate_api_key(key_type: str, key: str, user: dict = Depends(get_current_user_saas)):
     """Validate an API key"""
     db = get_db()
     service = ApiKeyService(db)
