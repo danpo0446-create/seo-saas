@@ -122,11 +122,11 @@ Collections:
 ### P1 (High)
 - ✅ ~~Email notifications on trial expiration~~ DONE
 - ✅ ~~Billing portal integration~~ DONE
-- [ ] Monthly usage reset scheduler (1st of month)
+- ✅ ~~Monthly usage reset scheduler~~ DONE
 
 ### P2 (Medium)
-- [ ] Annual billing option (20% discount)
-- [ ] Invoice PDF generation
+- ✅ ~~Annual billing option (20% discount)~~ DONE
+- ✅ ~~Invoice PDF generation~~ DONE
 - ✅ ~~Usage analytics dashboard~~ DONE
 - [ ] Referral program
 
