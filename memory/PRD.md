@@ -78,12 +78,29 @@ Collections:
 - ✅ Payment status verification
 - ✅ Webhook handler for payment events
 - ✅ Subscription upgrade on successful payment
+- ✅ Billing Portal endpoint (pentru utilizatori cu subscripție activă)
+
+#### Analytics Dashboard
+- ✅ ROI & Valoare Estimată card (cost plan, cost/articol, valoare SEO, câștig net)
+- ✅ Stats cards (articole, site-uri, keywords, backlinks)
+- ✅ Utilizare articole cu progress bar
+- ✅ Sumar performanță detailat
+- ✅ API /api/saas/analytics/overview
+
+#### Email Notifications (Resend)
+- ✅ Welcome email la înregistrare
+- ✅ Trial reminder (2 zile înainte de expirare)
+- ✅ Trial expired notification
+- ✅ Payment success confirmation
+- ✅ Scheduler pentru verificare zilnică trial expirations
+- ⚠️ Necesită RESEND_API_KEY în producție
 
 #### Frontend Pages
 - ✅ Landing page with hero, features, pricing preview, testimonials
 - ✅ Pricing page with all 4 plans comparison
 - ✅ Billing page with subscription status and usage
 - ✅ BYOAK tab for API keys configuration
+- ✅ Analytics Dashboard integrat în Dashboard principal
 
 #### API Endpoints
 - `GET /api/saas/plans` - Get all plans
@@ -100,16 +117,17 @@ Collections:
 ### P0 (Critical)
 - [ ] Configure production Stripe keys
 - [ ] Setup domain (app.clienti.ro)
+- [ ] Configure RESEND_API_KEY pentru email notifications
 
 ### P1 (High)
-- [ ] Email notifications on trial expiration
-- [ ] Billing portal integration
-- [ ] Monthly usage reset scheduler
+- ✅ ~~Email notifications on trial expiration~~ DONE
+- ✅ ~~Billing portal integration~~ DONE
+- [ ] Monthly usage reset scheduler (1st of month)
 
 ### P2 (Medium)
 - [ ] Annual billing option (20% discount)
 - [ ] Invoice PDF generation
-- [ ] Usage analytics dashboard
+- ✅ ~~Usage analytics dashboard~~ DONE
 - [ ] Referral program
 
 ### P3 (Nice to have)
