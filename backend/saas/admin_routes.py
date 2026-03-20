@@ -161,8 +161,6 @@ async def get_all_users(
             "current_period_end": sub.get("current_period_end") if sub else None
         })
     
-    total = await db.users.count_documents(query)
-    
     return enriched_users
 
 
@@ -409,7 +407,7 @@ def decrypt_platform_key(encrypted: str) -> str:
     import base64
     try:
         return base64.b64decode(encrypted.encode()).decode()
-    except:
+    except Exception:
         return encrypted
 
 
@@ -503,8 +501,76 @@ async def reset_user_password(user_id: str, data: ResetUserPasswordRequest, admi
         {"$set": {"password": new_hashed, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
+    # Create audit notification
+    await db.admin_notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "password_reset",
+        "title": "Parolă resetată",
+        "message": f"Parola utilizatorului {user.get('email')} a fost resetată manual",
+        "admin_id": admin["id"],
+        "admin_email": admin["email"],
+        "target_user_id": user_id,
+        "target_user_email": user.get("email"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "read": False
+    })
+    
     logging.info(f"[ADMIN] Password reset for user {user_id} ({user.get('email')}) by {admin['email']}")
     return {"message": f"Parola pentru {user.get('email')} a fost resetată cu succes"}
+
+
+# ============ NOTIFICATIONS ============
+
+@admin_router.get("/notifications")
+async def get_admin_notifications(
+    limit: int = 50,
+    unread_only: bool = False,
+    admin: dict = Depends(get_admin_user)
+):
+    """Get admin notifications for audit trail"""
+    db = get_db()
+    
+    query = {}
+    if unread_only:
+        query["read"] = False
+    
+    notifications = await db.admin_notifications.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    unread_count = await db.admin_notifications.count_documents({"read": False})
+    
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count
+    }
+
+
+@admin_router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, admin: dict = Depends(get_admin_user)):
+    """Mark a notification as read"""
+    db = get_db()
+    
+    await db.admin_notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": "Notificare marcată ca citită"}
+
+
+@admin_router.post("/notifications/read-all")
+async def mark_all_notifications_read(admin: dict = Depends(get_admin_user)):
+    """Mark all notifications as read"""
+    db = get_db()
+    
+    await db.admin_notifications.update_many(
+        {"read": False},
+        {"$set": {"read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": "Toate notificările au fost marcate ca citite"}
 
 
 @admin_router.put("/change-password")

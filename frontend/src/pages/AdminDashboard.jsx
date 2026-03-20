@@ -25,7 +25,7 @@ import {
   Users, FileText, Globe, CreditCard, TrendingUp, Activity,
   Search, ChevronLeft, ChevronRight, Trash2, Shield,
   Clock, Edit, UserCog, AlertTriangle, Phone, Mail, MapPin, Save,
-  Key, Eye, EyeOff, CheckCircle, Settings, Lock
+  Key, Eye, EyeOff, CheckCircle, Settings, Lock, Bell, Check
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -93,10 +93,16 @@ const AdminDashboard = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Notifications
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+
   useEffect(() => {
     fetchData();
     fetchContent();
     fetchPlatformSettings();
+    fetchNotifications();
   }, []);
 
   const fetchData = async () => {
@@ -203,6 +209,47 @@ const AdminDashboard = () => {
       setPlatformSettings(res.data);
     } catch (error) {
       console.log("Could not fetch platform settings");
+    }
+  };
+
+  const fetchNotifications = async () => {
+    setLoadingNotifications(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const res = await axios.get(`${API}/admin/notifications`, { headers });
+      setNotifications(res.data.notifications || []);
+      setUnreadCount(res.data.unread_count || 0);
+    } catch (error) {
+      console.log("Could not fetch notifications");
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const markNotificationRead = async (notificationId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(`${API}/admin/notifications/${notificationId}/read`, {}, { headers });
+      fetchNotifications();
+    } catch (error) {
+      console.log("Error marking notification as read");
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(`${API}/admin/notifications/read-all`, {}, { headers });
+      toast.success("Toate notificările au fost marcate ca citite");
+      fetchNotifications();
+    } catch (error) {
+      toast.error("Eroare la marcarea notificărilor");
     }
   };
 
@@ -434,6 +481,14 @@ const AdminDashboard = () => {
           </TabsTrigger>
           <TabsTrigger value="users" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
             Utilizatori
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black relative">
+            Notificări
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="content" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
             Continut Site
@@ -704,6 +759,97 @@ const AdminDashboard = () => {
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NOTIFICATIONS TAB */}
+        <TabsContent value="notifications" className="mt-6">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-[#00E676]" />
+                  Notificări & Jurnal Activități
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Istoric acțiuni administrative pentru audit și securitate
+                </CardDescription>
+              </div>
+              {unreadCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={markAllNotificationsRead}
+                  className="border-[#262626] text-[#A1A1AA] hover:text-white"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Marchează toate ca citite
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {loadingNotifications ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00E676]"></div>
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-12 text-[#71717A]">
+                  <Bell className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Nu există notificări</p>
+                  <p className="text-sm mt-1">Acțiunile administrative vor apărea aici</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={`p-4 rounded-lg border ${
+                        notif.read 
+                          ? 'bg-[#0A0A0A] border-[#262626]' 
+                          : 'bg-[#00E676]/5 border-[#00E676]/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            notif.type === 'password_reset' 
+                              ? 'bg-yellow-500/10' 
+                              : 'bg-blue-500/10'
+                          }`}>
+                            {notif.type === 'password_reset' ? (
+                              <Lock className="w-5 h-5 text-yellow-500" />
+                            ) : (
+                              <Bell className="w-5 h-5 text-blue-500" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-white font-medium">{notif.title}</p>
+                            <p className="text-[#A1A1AA] text-sm mt-1">{notif.message}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-[#71717A]">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {new Date(notif.created_at).toLocaleString('ro-RO')}
+                              </span>
+                              <span>Admin: {notif.admin_email}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {!notif.read && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => markNotificationRead(notif.id)}
+                            className="text-[#00E676] hover:text-[#00E676]/80"
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
