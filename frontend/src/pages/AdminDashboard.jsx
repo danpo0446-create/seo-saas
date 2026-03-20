@@ -76,12 +76,15 @@ const AdminDashboard = () => {
 
   // Platform settings
   const [platformSettings, setPlatformSettings] = useState({
-    has_stripe_key: false,
+    has_stripe_secret_key: false,
+    has_stripe_publishable_key: false,
     has_resend_key: false
   });
-  const [stripeKey, setStripeKey] = useState("");
+  const [stripeSecretKey, setStripeSecretKey] = useState("");
+  const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [resendKey, setResendKey] = useState("");
-  const [showStripeKey, setShowStripeKey] = useState(false);
+  const [showStripeSecretKey, setShowStripeSecretKey] = useState(false);
+  const [showStripePublishableKey, setShowStripePublishableKey] = useState(false);
   const [showResendKey, setShowResendKey] = useState(false);
   const [savingPlatform, setSavingPlatform] = useState(false);
 
@@ -260,7 +263,8 @@ const AdminDashboard = () => {
       const headers = { Authorization: `Bearer ${token}` };
       
       const data = {};
-      if (stripeKey.trim()) data.stripe_key = stripeKey.trim();
+      if (stripeSecretKey.trim()) data.stripe_secret_key = stripeSecretKey.trim();
+      if (stripePublishableKey.trim()) data.stripe_publishable_key = stripePublishableKey.trim();
       if (resendKey.trim()) data.resend_key = resendKey.trim();
       
       if (Object.keys(data).length === 0) {
@@ -269,8 +273,9 @@ const AdminDashboard = () => {
       }
       
       await axios.put(`${API}/admin/platform-settings`, data, { headers });
-      toast.success("Cheile au fost salvate! Serverul va folosi noile chei.");
-      setStripeKey("");
+      toast.success("Cheile au fost salvate!");
+      setStripeSecretKey("");
+      setStripePublishableKey("");
       setResendKey("");
       fetchPlatformSettings();
     } catch (error) {
@@ -1125,11 +1130,11 @@ const AdminDashboard = () => {
                     <div className="flex items-center gap-3">
                       <CreditCard className="w-5 h-5 text-purple-500" />
                       <div>
-                        <p className="text-white font-medium">Stripe API Key</p>
-                        <p className="text-[#71717A] text-sm">Pentru procesare plăți</p>
+                        <p className="text-white font-medium">Stripe Secret Key</p>
+                        <p className="text-[#71717A] text-sm">Pentru procesare plăți (sk_...)</p>
                       </div>
                     </div>
-                    {platformSettings.has_stripe_key ? (
+                    {platformSettings.has_stripe_secret_key ? (
                       <Badge className="bg-[#00E676]/10 text-[#00E676]">
                         <CheckCircle className="w-3 h-3 mr-1" /> Configurat
                       </Badge>
@@ -1142,7 +1147,26 @@ const AdminDashboard = () => {
                   
                   <div className="flex items-center justify-between p-3 rounded-lg bg-[#171717]">
                     <div className="flex items-center gap-3">
-                      <Mail className="w-5 h-5 text-blue-500" />
+                      <CreditCard className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <p className="text-white font-medium">Stripe Publishable Key</p>
+                        <p className="text-[#71717A] text-sm">Pentru frontend checkout (pk_...)</p>
+                      </div>
+                    </div>
+                    {platformSettings.has_stripe_publishable_key ? (
+                      <Badge className="bg-[#00E676]/10 text-[#00E676]">
+                        <CheckCircle className="w-3 h-3 mr-1" /> Configurat
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-red-500/10 text-red-400">
+                        Neconfigurat
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-[#171717]">
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-5 h-5 text-green-500" />
                       <div>
                         <p className="text-white font-medium">Resend API Key</p>
                         <p className="text-[#71717A] text-sm">Pentru emailuri sistem</p>
@@ -1183,26 +1207,48 @@ const AdminDashboard = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-[#A1A1AA] flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" /> Stripe API Key (sk_live_...)
+                    <CreditCard className="w-4 h-4" /> Stripe Secret Key (sk_live_...)
                   </Label>
                   <div className="relative">
                     <Input
-                      type={showStripeKey ? "text" : "password"}
+                      type={showStripeSecretKey ? "text" : "password"}
                       placeholder="sk_live_..."
-                      value={stripeKey}
-                      onChange={(e) => setStripeKey(e.target.value)}
+                      value={stripeSecretKey}
+                      onChange={(e) => setStripeSecretKey(e.target.value)}
                       className="bg-[#171717] border-[#262626] text-white pr-10"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowStripeKey(!showStripeKey)}
+                      onClick={() => setShowStripeSecretKey(!showStripeSecretKey)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
                     >
-                      {showStripeKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showStripeSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" /> Stripe Publishable Key (pk_live_...)
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showStripePublishableKey ? "text" : "password"}
+                      placeholder="pk_live_..."
+                      value={stripePublishableKey}
+                      onChange={(e) => setStripePublishableKey(e.target.value)}
+                      className="bg-[#171717] border-[#262626] text-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowStripePublishableKey(!showStripePublishableKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                    >
+                      {showStripePublishableKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                   <p className="text-[#71717A] text-xs">
-                    Obține de la: <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-[#00E676] hover:underline">dashboard.stripe.com/apikeys</a>
+                    Obține ambele de la: <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-[#00E676] hover:underline">dashboard.stripe.com/apikeys</a>
                   </p>
                 </div>
                 
@@ -1233,7 +1279,7 @@ const AdminDashboard = () => {
                 
                 <Button
                   onClick={savePlatformSettings}
-                  disabled={savingPlatform || (!stripeKey && !resendKey)}
+                  disabled={savingPlatform || (!stripeSecretKey && !stripePublishableKey && !resendKey)}
                   className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
                 >
                   <Save className="w-4 h-4 mr-2" />

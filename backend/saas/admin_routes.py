@@ -392,7 +392,8 @@ async def initialize_first_admin(email: str, secret_key: str):
 # ============ PLATFORM SETTINGS ============
 
 class PlatformSettingsUpdate(BaseModel):
-    stripe_key: Optional[str] = None
+    stripe_secret_key: Optional[str] = None
+    stripe_publishable_key: Optional[str] = None
     resend_key: Optional[str] = None
 
 
@@ -419,7 +420,8 @@ async def get_platform_settings(admin: dict = Depends(get_admin_user)):
     settings = await db.platform_settings.find_one({"id": "main"}, {"_id": 0})
     
     return {
-        "has_stripe_key": bool(settings.get("stripe_key")) if settings else False,
+        "has_stripe_secret_key": bool(settings.get("stripe_secret_key") or settings.get("stripe_key")) if settings else False,
+        "has_stripe_publishable_key": bool(settings.get("stripe_publishable_key")) if settings else False,
         "has_resend_key": bool(settings.get("resend_key")) if settings else False
     }
 
@@ -431,10 +433,15 @@ async def update_platform_settings(data: PlatformSettingsUpdate, admin: dict = D
     
     update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
     
-    if data.stripe_key:
-        if not data.stripe_key.startswith("sk_"):
-            raise HTTPException(status_code=400, detail="Cheia Stripe trebuie să înceapă cu 'sk_'")
-        update_data["stripe_key"] = encrypt_platform_key(data.stripe_key)
+    if data.stripe_secret_key:
+        if not data.stripe_secret_key.startswith("sk_"):
+            raise HTTPException(status_code=400, detail="Secret Key Stripe trebuie să înceapă cu 'sk_'")
+        update_data["stripe_secret_key"] = encrypt_platform_key(data.stripe_secret_key)
+    
+    if data.stripe_publishable_key:
+        if not data.stripe_publishable_key.startswith("pk_"):
+            raise HTTPException(status_code=400, detail="Publishable Key Stripe trebuie să înceapă cu 'pk_'")
+        update_data["stripe_publishable_key"] = encrypt_platform_key(data.stripe_publishable_key)
     
     if data.resend_key:
         if not data.resend_key.startswith("re_"):
