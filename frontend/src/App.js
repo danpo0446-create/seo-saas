@@ -30,6 +30,7 @@ import PrivacyPage from "@/pages/PrivacyPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import SetupGuidePage from "@/pages/SetupGuidePage";
+import DocsPage from "@/pages/DocsPage";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -112,6 +113,7 @@ function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="billing" element={<BillingPage />} />
               <Route path="api-keys" element={<ApiKeysPage />} />
+              <Route path="docs" element={<DocsPage />} />
               <Route path="admin" element={<AdminDashboard />} />
             </Route>
             

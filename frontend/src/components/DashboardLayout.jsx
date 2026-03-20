@@ -42,7 +42,7 @@ const navItems = [
   { path: '/app/keywords', icon: Search, label: 'Cuvinte-cheie' },
   { path: '/app/calendar', icon: Calendar, label: 'Calendar Editorial' },
   { path: '/app/backlinks', icon: Link, label: 'Backlinks' },
-  { path: '/app/web2', icon: Share2, label: 'Web 2.0 Links' },
+  { path: '/app/web2', icon: Share2, label: 'Web 2.0 Links', adminOnly: true },
   { path: '/app/wordpress', icon: Globe, label: 'Site-uri WordPress' },
   { path: '/app/automation', icon: Bot, label: 'Automatizare' },
   { path: '/app/reports', icon: BarChart3, label: 'Rapoarte' },
@@ -51,6 +51,7 @@ const navItems = [
   { path: '/app/business-analysis', icon: Brain, label: 'Analiză Business' },
   { path: '/app/indexing', icon: SearchCheck, label: 'Indexare Google' },
   { path: '/app/api-keys', icon: Key, label: 'Chei API' },
+  { path: '/app/docs', icon: FileSearch, label: 'Documentație' },
   { path: '/app/billing', icon: CreditCard, label: 'Facturare' },
   { path: '/app/settings', icon: Settings, label: 'Setări' },
 ];
@@ -155,7 +156,9 @@ export const DashboardLayout = () => {
           {/* Navigation */}
           <ScrollArea className="flex-1 py-4">
             <nav className="px-3 space-y-1">
-              {navItems.map((item) => (
+              {navItems
+                .filter(item => !item.adminOnly || user?.role === 'admin')
+                .map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}

@@ -34,7 +34,9 @@ import {
   ShoppingCart,
   Sparkles,
   Globe,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -51,6 +53,130 @@ export default function ReportsPage() {
   const [weeklyReport, setWeeklyReport] = useState(null);
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [activeTab, setActiveTab] = useState('weekly');
+  const [exporting, setExporting] = useState(false);
+
+  // Export to CSV
+  const exportToCSV = (data, filename) => {
+    if (!data) return;
+    
+    let csvContent = "";
+    
+    // Articles data
+    if (data.articles_by_status) {
+      csvContent += "Status Articole\n";
+      csvContent += "Status,Numar\n";
+      data.articles_by_status.forEach(item => {
+        csvContent += `${item.name},${item.value}\n`;
+      });
+      csvContent += "\n";
+    }
+    
+    // Daily stats
+    if (data.daily_stats) {
+      csvContent += "Statistici Zilnice\n";
+      csvContent += "Data,Articole,Cuvinte\n";
+      data.daily_stats.forEach(item => {
+        csvContent += `${item.date},${item.articles},${item.words}\n`;
+      });
+      csvContent += "\n";
+    }
+    
+    // Summary
+    csvContent += "Sumar\n";
+    csvContent += `Total Articole,${data.total_articles || 0}\n`;
+    csvContent += `Total Cuvinte,${data.total_words || 0}\n`;
+    csvContent += `Articole Publicate,${data.published_articles || 0}\n`;
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    toast({
+      title: 'Export CSV',
+      description: 'Fisierul a fost descarcat',
+    });
+  };
+
+  // Export to PDF (simple HTML to PDF)
+  const exportToPDF = (data, title) => {
+    if (!data) return;
+    setExporting(true);
+    
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+          h1 { color: #10b981; border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+          h2 { color: #666; margin-top: 30px; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+          th { background: #f5f5f5; }
+          .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0; }
+          .stat-box { background: #f9f9f9; padding: 20px; border-radius: 8px; text-align: center; }
+          .stat-value { font-size: 32px; font-weight: bold; color: #10b981; }
+          .stat-label { color: #666; margin-top: 5px; }
+          .footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <p>Generat la: ${new Date().toLocaleString('ro-RO')}</p>
+        
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-value">${data.total_articles || 0}</div>
+            <div class="stat-label">Total Articole</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value">${(data.total_words || 0).toLocaleString()}</div>
+            <div class="stat-label">Total Cuvinte</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value">${data.published_articles || 0}</div>
+            <div class="stat-label">Publicate</div>
+          </div>
+        </div>
+        
+        ${data.articles_by_status ? `
+          <h2>Status Articole</h2>
+          <table>
+            <tr><th>Status</th><th>Numar</th></tr>
+            ${data.articles_by_status.map(item => `<tr><td>${item.name}</td><td>${item.value}</td></tr>`).join('')}
+          </table>
+        ` : ''}
+        
+        ${data.daily_stats ? `
+          <h2>Activitate Zilnica</h2>
+          <table>
+            <tr><th>Data</th><th>Articole</th><th>Cuvinte</th></tr>
+            ${data.daily_stats.slice(0, 14).map(item => `<tr><td>${item.date}</td><td>${item.articles}</td><td>${item.words}</td></tr>`).join('')}
+          </table>
+        ` : ''}
+        
+        <div class="footer">
+          <p>Raport generat de SEO Automation</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+    
+    setExporting(false);
+    toast({
+      title: 'Export PDF',
+      description: 'Fereastra de printare s-a deschis',
+    });
+  };
 
   const fetchReports = async () => {
     setLoading(true);
@@ -197,10 +323,43 @@ export default function ReportsPage() {
               {formatDate(period?.start)} - {formatDate(period?.end)}
             </p>
           </div>
-          <Badge variant="outline" className="text-primary">
-            <Calendar className="w-3 h-3 mr-1" />
-            {period?.days || 7} zile
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV({
+                total_articles: summary?.total_articles,
+                total_words: summary?.total_words,
+                published_articles: summary?.published,
+                articles_by_status: articleTypesData,
+                daily_stats: dailyChartData.map(d => ({ date: d.fullDate, articles: d.generate, words: d.publicate }))
+              }, `raport_${periodLabel.toLowerCase()}`)}
+              className="border-[#262626]"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToPDF({
+                total_articles: summary?.total_articles,
+                total_words: summary?.total_words || (summary?.total_articles * 1500),
+                published_articles: summary?.published,
+                articles_by_status: articleTypesData,
+                daily_stats: dailyChartData.map(d => ({ date: d.fullDate, articles: d.generate, words: d.publicate }))
+              }, `Raport ${periodLabel} - SEO Automation`)}
+              disabled={exporting}
+              className="border-[#262626]"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              PDF
+            </Button>
+            <Badge variant="outline" className="text-primary">
+              <Calendar className="w-3 h-3 mr-1" />
+              {period?.days || 7} zile
+            </Badge>
+          </div>
         </div>
 
         {/* Summary Stats */}
