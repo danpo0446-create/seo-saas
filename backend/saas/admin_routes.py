@@ -388,3 +388,77 @@ async def initialize_first_admin(email: str, secret_key: str):
     
     logging.info(f"[ADMIN] Initialized first admin: {email}")
     return {"message": f"User {email} is now admin"}
+
+
+
+# ============ PLATFORM SETTINGS ============
+
+class PlatformSettingsUpdate(BaseModel):
+    stripe_key: Optional[str] = None
+    resend_key: Optional[str] = None
+
+
+def encrypt_platform_key(key: str) -> str:
+    """Simple encryption for platform keys"""
+    import base64
+    return base64.b64encode(key.encode()).decode()
+
+
+def decrypt_platform_key(encrypted: str) -> str:
+    """Decrypt platform key"""
+    import base64
+    try:
+        return base64.b64decode(encrypted.encode()).decode()
+    except:
+        return encrypted
+
+
+@admin_router.get("/platform-settings")
+async def get_platform_settings(admin: dict = Depends(get_admin_user)):
+    """Get platform settings status"""
+    db = get_db()
+    
+    settings = await db.platform_settings.find_one({"id": "main"}, {"_id": 0})
+    
+    return {
+        "has_stripe_key": bool(settings.get("stripe_key")) if settings else False,
+        "has_resend_key": bool(settings.get("resend_key")) if settings else False
+    }
+
+
+@admin_router.put("/platform-settings")
+async def update_platform_settings(data: PlatformSettingsUpdate, admin: dict = Depends(get_admin_user)):
+    """Update platform API keys"""
+    db = get_db()
+    
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if data.stripe_key:
+        if not data.stripe_key.startswith("sk_"):
+            raise HTTPException(status_code=400, detail="Cheia Stripe trebuie să înceapă cu 'sk_'")
+        update_data["stripe_key"] = encrypt_platform_key(data.stripe_key)
+    
+    if data.resend_key:
+        if not data.resend_key.startswith("re_"):
+            raise HTTPException(status_code=400, detail="Cheia Resend trebuie să înceapă cu 're_'")
+        update_data["resend_key"] = encrypt_platform_key(data.resend_key)
+    
+    await db.platform_settings.update_one(
+        {"id": "main"},
+        {"$set": {**update_data, "id": "main"}},
+        upsert=True
+    )
+    
+    logging.info(f"[ADMIN] Platform settings updated by {admin['email']}")
+    return {"message": "Cheile au fost salvate"}
+
+
+async def get_platform_key(key_name: str) -> Optional[str]:
+    """Get decrypted platform key for use in services"""
+    db = get_db()
+    settings = await db.platform_settings.find_one({"id": "main"}, {"_id": 0})
+    
+    if not settings or not settings.get(key_name):
+        return None
+    
+    return decrypt_platform_key(settings[key_name])

@@ -24,7 +24,8 @@ import {
 import { 
   Users, FileText, Globe, CreditCard, TrendingUp, Activity,
   Search, ChevronLeft, ChevronRight, Trash2, Shield,
-  Clock, Edit, UserCog, AlertTriangle, Phone, Mail, MapPin, Save
+  Clock, Edit, UserCog, AlertTriangle, Phone, Mail, MapPin, Save,
+  Key, Eye, EyeOff, CheckCircle, Settings
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -71,9 +72,21 @@ const AdminDashboard = () => {
   const [savingTerms, setSavingTerms] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
 
+  // Platform settings
+  const [platformSettings, setPlatformSettings] = useState({
+    has_stripe_key: false,
+    has_resend_key: false
+  });
+  const [stripeKey, setStripeKey] = useState("");
+  const [resendKey, setResendKey] = useState("");
+  const [showStripeKey, setShowStripeKey] = useState(false);
+  const [showResendKey, setShowResendKey] = useState(false);
+  const [savingPlatform, setSavingPlatform] = useState(false);
+
   useEffect(() => {
     fetchData();
     fetchContent();
+    fetchPlatformSettings();
   }, []);
 
   const fetchData = async () => {
@@ -168,6 +181,45 @@ const AdminDashboard = () => {
       toast.error("Eroare la salvare");
     } finally {
       setSavingPrivacy(false);
+    }
+  };
+
+  const fetchPlatformSettings = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const res = await axios.get(`${API}/admin/platform-settings`, { headers });
+      setPlatformSettings(res.data);
+    } catch (error) {
+      console.log("Could not fetch platform settings");
+    }
+  };
+
+  const savePlatformSettings = async () => {
+    setSavingPlatform(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const data = {};
+      if (stripeKey.trim()) data.stripe_key = stripeKey.trim();
+      if (resendKey.trim()) data.resend_key = resendKey.trim();
+      
+      if (Object.keys(data).length === 0) {
+        toast.error("Introdu cel putin o cheie");
+        return;
+      }
+      
+      await axios.put(`${API}/admin/platform-settings`, data, { headers });
+      toast.success("Cheile au fost salvate! Serverul va folosi noile chei.");
+      setStripeKey("");
+      setResendKey("");
+      fetchPlatformSettings();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la salvare");
+    } finally {
+      setSavingPlatform(false);
     }
   };
 
@@ -314,6 +366,9 @@ const AdminDashboard = () => {
           </TabsTrigger>
           <TabsTrigger value="content" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
             Continut Site
+          </TabsTrigger>
+          <TabsTrigger value="platform" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
+            Setari Platforma
           </TabsTrigger>
         </TabsList>
 
@@ -817,6 +872,145 @@ const AdminDashboard = () => {
                 >
                   <Save className="w-4 h-4 mr-2" />
                   {savingPrivacy ? "Se salveaza..." : "Salveaza Privacy"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* PLATFORM SETTINGS TAB */}
+        <TabsContent value="platform" className="mt-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Current Status */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-[#00E676]" />
+                  Status Chei Platformă
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Cheile API necesare pentru funcționarea platformei
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-[#171717]">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-5 h-5 text-purple-500" />
+                      <div>
+                        <p className="text-white font-medium">Stripe API Key</p>
+                        <p className="text-[#71717A] text-sm">Pentru procesare plăți</p>
+                      </div>
+                    </div>
+                    {platformSettings.has_stripe_key ? (
+                      <Badge className="bg-[#00E676]/10 text-[#00E676]">
+                        <CheckCircle className="w-3 h-3 mr-1" /> Configurat
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-red-500/10 text-red-400">
+                        Neconfigurat
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-[#171717]">
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <p className="text-white font-medium">Resend API Key</p>
+                        <p className="text-[#71717A] text-sm">Pentru emailuri sistem</p>
+                      </div>
+                    </div>
+                    {platformSettings.has_resend_key ? (
+                      <Badge className="bg-[#00E676]/10 text-[#00E676]">
+                        <CheckCircle className="w-3 h-3 mr-1" /> Configurat
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-yellow-500/10 text-yellow-500">
+                        Opțional
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="p-3 rounded-lg bg-[#00E676]/5 border border-[#00E676]/20">
+                  <p className="text-[#A1A1AA] text-sm">
+                    <strong className="text-white">Notă:</strong> Cheile sunt criptate și stocate securizat. 
+                    După salvare, serverul le va folosi automat.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Add/Update Keys */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Key className="w-5 h-5 text-[#00E676]" />
+                  Adaugă/Actualizează Chei
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Introdu cheile pentru a le salva în platformă
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" /> Stripe API Key (sk_live_...)
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showStripeKey ? "text" : "password"}
+                      placeholder="sk_live_..."
+                      value={stripeKey}
+                      onChange={(e) => setStripeKey(e.target.value)}
+                      className="bg-[#171717] border-[#262626] text-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowStripeKey(!showStripeKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                    >
+                      {showStripeKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[#71717A] text-xs">
+                    Obține de la: <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-[#00E676] hover:underline">dashboard.stripe.com/apikeys</a>
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <Mail className="w-4 h-4" /> Resend API Key (re_...)
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showResendKey ? "text" : "password"}
+                      placeholder="re_..."
+                      value={resendKey}
+                      onChange={(e) => setResendKey(e.target.value)}
+                      className="bg-[#171717] border-[#262626] text-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResendKey(!showResendKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                    >
+                      {showResendKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[#71717A] text-xs">
+                    Obține de la: <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-[#00E676] hover:underline">resend.com/api-keys</a>
+                  </p>
+                </div>
+                
+                <Button
+                  onClick={savePlatformSettings}
+                  disabled={savingPlatform || (!stripeKey && !resendKey)}
+                  className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {savingPlatform ? "Se salvează..." : "Salvează Cheile"}
                 </Button>
               </CardContent>
             </Card>
