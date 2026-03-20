@@ -25,7 +25,7 @@ import {
   Users, FileText, Globe, CreditCard, TrendingUp, Activity,
   Search, ChevronLeft, ChevronRight, Trash2, Shield,
   Clock, Edit, UserCog, AlertTriangle, Phone, Mail, MapPin, Save,
-  Key, Eye, EyeOff, CheckCircle, Settings
+  Key, Eye, EyeOff, CheckCircle, Settings, Lock
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -82,6 +82,14 @@ const AdminDashboard = () => {
   const [showStripeKey, setShowStripeKey] = useState(false);
   const [showResendKey, setShowResendKey] = useState(false);
   const [savingPlatform, setSavingPlatform] = useState(false);
+
+  // Password change
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -220,6 +228,37 @@ const AdminDashboard = () => {
       toast.error(error.response?.data?.detail || "Eroare la salvare");
     } finally {
       setSavingPlatform(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast.error("Parolele noi nu coincid");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Parola nouă trebuie să aibă minim 6 caractere");
+      return;
+    }
+    
+    setChangingPassword(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.put(`${API}/admin/change-password`, {
+        current_password: currentPassword,
+        new_password: newPassword
+      }, { headers });
+      
+      toast.success("Parola a fost schimbată cu succes!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la schimbarea parolei");
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -1011,6 +1050,80 @@ const AdminDashboard = () => {
                 >
                   <Save className="w-4 h-4 mr-2" />
                   {savingPlatform ? "Se salvează..." : "Salvează Cheile"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Change Password */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-orange-500" />
+                  Schimbă Parola
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Schimbă parola contului tău de administrator
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Parola curentă</Label>
+                  <div className="relative">
+                    <Input
+                      type={showCurrentPassword ? "text" : "password"}
+                      placeholder="Parola actuală"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="bg-[#171717] border-[#262626] text-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Parola nouă</Label>
+                  <div className="relative">
+                    <Input
+                      type={showNewPassword ? "text" : "password"}
+                      placeholder="Minim 6 caractere"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="bg-[#171717] border-[#262626] text-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Confirmă parola nouă</Label>
+                  <Input
+                    type="password"
+                    placeholder="Repetă parola nouă"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-[#171717] border-[#262626] text-white"
+                  />
+                </div>
+                
+                <Button
+                  onClick={changePassword}
+                  disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                  className="w-full bg-orange-500 text-white hover:bg-orange-600"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  {changingPassword ? "Se schimbă..." : "Schimbă Parola"}
                 </Button>
               </CardContent>
             </Card>

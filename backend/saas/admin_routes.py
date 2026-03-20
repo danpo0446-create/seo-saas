@@ -462,3 +462,42 @@ async def get_platform_key(key_name: str) -> Optional[str]:
         return None
     
     return decrypt_platform_key(settings[key_name])
+
+
+
+# ============ CHANGE PASSWORD ============
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@admin_router.put("/change-password")
+async def change_admin_password(data: ChangePasswordRequest, admin: dict = Depends(get_admin_user)):
+    """Change admin password"""
+    import bcrypt
+    db = get_db()
+    
+    # Get user with password
+    user = await db.users.find_one({"id": admin["id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizator negăsit")
+    
+    # Verify current password
+    if not bcrypt.checkpw(data.current_password.encode('utf-8'), user["password"].encode('utf-8')):
+        raise HTTPException(status_code=400, detail="Parola curentă este incorectă")
+    
+    # Validate new password
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
+    
+    # Hash and save new password
+    new_hashed = bcrypt.hashpw(data.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    await db.users.update_one(
+        {"id": admin["id"]},
+        {"$set": {"password": new_hashed, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    logging.info(f"[ADMIN] Password changed for {admin['email']}")
+    return {"message": "Parola a fost schimbată cu succes"}
