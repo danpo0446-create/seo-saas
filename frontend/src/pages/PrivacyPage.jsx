@@ -41,11 +41,18 @@ const PrivacyPage = () => {
               </div>
               <span className="text-xl font-bold text-white">SEO Automation</span>
             </Link>
-            <Link to="/register">
-              <Button className="bg-[#00E676] text-black hover:bg-[#00E676]/90">
-                Incepe Gratuit
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link to="/login">
+                <Button variant="ghost" className="text-[#A1A1AA] hover:text-white">
+                  Autentificare
+                </Button>
+              </Link>
+              <Link to="/register">
+                <Button className="bg-[#00E676] text-black hover:bg-[#00E676]/90">
+                  Incepe Gratuit
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </nav>

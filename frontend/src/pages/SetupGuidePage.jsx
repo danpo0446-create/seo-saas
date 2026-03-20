@@ -168,6 +168,11 @@ const SetupGuidePage = () => {
                   Preturi
                 </Button>
               </Link>
+              <Link to="/login">
+                <Button variant="ghost" className="text-[#A1A1AA] hover:text-white">
+                  Autentificare
+                </Button>
+              </Link>
               <Link to="/register">
                 <Button className="bg-[#00E676] text-black hover:bg-[#00E676]/90">
                   Incepe Gratuit
