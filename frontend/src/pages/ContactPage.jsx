@@ -1,12 +1,15 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Zap, Mail, MapPin, Phone } from "lucide-react";
+import { Zap, Mail, MapPin, Phone, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
 import { toast } from "sonner";
+import axios from "axios";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -16,13 +19,38 @@ const ContactPage = () => {
     message: ""
   });
   const [sending, setSending] = useState(false);
+  
+  // Dynamic content from admin
+  const [contactInfo, setContactInfo] = useState({
+    email: "support@seoautomation.ro",
+    phone: "+40 721 234 567",
+    address: "Bucuresti, Romania",
+    hours: "Luni - Vineri, 9:00 - 18:00"
+  });
+
+  useEffect(() => {
+    fetchContactInfo();
+  }, []);
+
+  const fetchContactInfo = async () => {
+    try {
+      // Try to get content from public endpoint
+      const res = await axios.get(`${API}/saas/content/contact`);
+      if (res.data?.content) {
+        setContactInfo(res.data.content);
+      }
+    } catch (error) {
+      // Use default values if endpoint doesn't exist or fails
+      console.log("Using default contact info");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSending(true);
     // Simulare trimitere
     await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.success("Mesajul a fost trimis! Te vom contacta în curând.");
+    toast.success("Mesajul a fost trimis! Te vom contacta in curand.");
     setFormData({ name: "", email: "", subject: "", message: "" });
     setSending(false);
   };
@@ -47,7 +75,7 @@ const ContactPage = () => {
               </Link>
               <Link to="/register">
                 <Button className="bg-[#00E676] text-black hover:bg-[#00E676]/90">
-                  Începe Gratuit
+                  Incepe Gratuit
                 </Button>
               </Link>
             </div>
@@ -58,9 +86,9 @@ const ContactPage = () => {
       <div className="pt-32 pb-20 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-4">Contactează-ne</h1>
+            <h1 className="text-4xl font-bold text-white mb-4">Contacteaza-ne</h1>
             <p className="text-[#A1A1AA] text-lg">
-              Ai întrebări? Suntem aici să te ajutăm.
+              Ai intrebari? Suntem aici sa te ajutam.
             </p>
           </div>
 
@@ -75,8 +103,8 @@ const ContactPage = () => {
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-1">Email</h3>
-                      <p className="text-[#A1A1AA]">support@seoautomation.ro</p>
-                      <p className="text-[#71717A] text-sm mt-1">Răspundem în 24h</p>
+                      <p className="text-[#A1A1AA]">{contactInfo.email}</p>
+                      <p className="text-[#71717A] text-sm mt-1">Raspundem in 24h</p>
                     </div>
                   </div>
                 </CardContent>
@@ -90,8 +118,8 @@ const ContactPage = () => {
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-1">Telefon</h3>
-                      <p className="text-[#A1A1AA]">+40 721 234 567</p>
-                      <p className="text-[#71717A] text-sm mt-1">Luni - Vineri, 9:00 - 18:00</p>
+                      <p className="text-[#A1A1AA]">{contactInfo.phone}</p>
+                      <p className="text-[#71717A] text-sm mt-1">{contactInfo.hours}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -104,9 +132,8 @@ const ContactPage = () => {
                       <MapPin className="w-6 h-6 text-[#00E676]" />
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold mb-1">Adresă</h3>
-                      <p className="text-[#A1A1AA]">București, România</p>
-                      <p className="text-[#71717A] text-sm mt-1">Sector 1</p>
+                      <h3 className="text-white font-semibold mb-1">Adresa</h3>
+                      <p className="text-[#A1A1AA]">{contactInfo.address}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -128,7 +155,7 @@ const ContactPage = () => {
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
                         className="bg-[#171717] border-[#262626] text-white"
-                        placeholder="Numele tău"
+                        placeholder="Numele tau"
                       />
                     </div>
                     <div className="space-y-2">
@@ -160,7 +187,7 @@ const ContactPage = () => {
                       value={formData.message}
                       onChange={(e) => setFormData({...formData, message: e.target.value})}
                       className="bg-[#171717] border-[#262626] text-white min-h-[150px]"
-                      placeholder="Scrie mesajul tău aici..."
+                      placeholder="Scrie mesajul tau aici..."
                     />
                   </div>
                   <Button 
@@ -179,10 +206,16 @@ const ContactPage = () => {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-[#262626]">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-[#71717A] text-sm">
-            © 2026 SEO Automation. Toate drepturile rezervate.
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex gap-6 text-[#71717A] text-sm">
+              <Link to="/terms" className="hover:text-white transition-colors">Termeni</Link>
+              <Link to="/privacy" className="hover:text-white transition-colors">Confidentialitate</Link>
+            </div>
+            <p className="text-[#71717A] text-sm">
+              © 2026 SEO Automation. Toate drepturile rezervate.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

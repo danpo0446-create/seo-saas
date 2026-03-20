@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +23,8 @@ import {
 } from "@/components/ui/select";
 import { 
   Users, FileText, Globe, CreditCard, TrendingUp, Activity,
-  Search, ChevronLeft, ChevronRight, Eye, Trash2, Shield,
-  Clock, Mail, Calendar, Edit, UserCog, Ban, AlertTriangle
+  Search, ChevronLeft, ChevronRight, Trash2, Shield,
+  Clock, Edit, UserCog, AlertTriangle, Phone, Mail, MapPin, Save
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -35,6 +37,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState("stats");
   const usersPerPage = 10;
 
   // Dialog states
@@ -45,8 +48,18 @@ const AdminDashboard = () => {
   const [editStatus, setEditStatus] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Content editing states
+  const [contactContent, setContactContent] = useState({
+    email: "support@seoautomation.ro",
+    phone: "+40 721 234 567",
+    address: "Bucuresti, Romania",
+    hours: "Luni - Vineri, 9:00 - 18:00"
+  });
+  const [savingContent, setSavingContent] = useState(false);
+
   useEffect(() => {
     fetchData();
+    fetchContent();
   }, []);
 
   const fetchData = async () => {
@@ -70,6 +83,36 @@ const AdminDashboard = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchContent = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const res = await axios.get(`${API}/admin/content`, { headers });
+      const contactData = res.data.find(c => c.page_id === "contact");
+      if (contactData?.content) {
+        setContactContent(contactData.content);
+      }
+    } catch (error) {
+      console.log("Using default content");
+    }
+  };
+
+  const saveContactContent = async () => {
+    setSavingContent(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.put(`${API}/admin/content/contact`, contactContent, { headers });
+      toast.success("Informatiile de contact au fost salvate!");
+    } catch (error) {
+      toast.error("Eroare la salvarea continutului");
+    } finally {
+      setSavingContent(false);
     }
   };
 
@@ -202,261 +245,413 @@ const AdminDashboard = () => {
             <Shield className="w-8 h-8 text-[#00E676]" />
             Admin Dashboard
           </h1>
-          <p className="text-[#71717A] mt-1">Gestioneaza utilizatorii si monitorizeaza platforma</p>
+          <p className="text-[#71717A] mt-1">Gestioneaza utilizatorii si platforma</p>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[#71717A] text-sm">Total Utilizatori</p>
-                  <p className="text-3xl font-bold text-white">{stats.total_users}</p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-blue-500" />
-                </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-[#171717] border border-[#262626]">
+          <TabsTrigger value="stats" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
+            Statistici
+          </TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
+            Utilizatori
+          </TabsTrigger>
+          <TabsTrigger value="content" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
+            Continut Site
+          </TabsTrigger>
+        </TabsList>
+
+        {/* STATS TAB */}
+        <TabsContent value="stats" className="space-y-6 mt-6">
+          {/* Stats Cards */}
+          {stats && (
+            <>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[#71717A] text-sm">Total Utilizatori</p>
+                        <p className="text-3xl font-bold text-white">{stats.total_users}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                        <Users className="w-6 h-6 text-blue-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[#71717A] text-sm">Subscriptii Active</p>
+                        <p className="text-3xl font-bold text-white">{stats.active_subscriptions}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                        <CreditCard className="w-6 h-6 text-[#00E676]" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[#71717A] text-sm">Total Articole</p>
+                        <p className="text-3xl font-bold text-white">{stats.total_articles}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-purple-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[#71717A] text-sm">Site-uri Conectate</p>
+                        <p className="text-3xl font-bold text-white">{stats.total_sites}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                        <Globe className="w-6 h-6 text-orange-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[#71717A] text-sm">Subscriptii Active</p>
-                  <p className="text-3xl font-bold text-white">{stats.active_subscriptions}</p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
-                  <CreditCard className="w-6 h-6 text-[#00E676]" />
-                </div>
+              {/* Revenue Stats */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-[#00E676]" />
+                      </div>
+                      <div>
+                        <p className="text-[#71717A] text-sm">Venit Lunar Estimat</p>
+                        <p className="text-2xl font-bold text-[#00E676]">{stats.monthly_revenue} EUR</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                        <Clock className="w-6 h-6 text-yellow-500" />
+                      </div>
+                      <div>
+                        <p className="text-[#71717A] text-sm">Utilizatori in Trial</p>
+                        <p className="text-2xl font-bold text-yellow-500">{stats.trial_users}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                        <Activity className="w-6 h-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-[#71717A] text-sm">Activi Azi</p>
+                        <p className="text-2xl font-bold text-blue-500">{stats.active_today}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[#71717A] text-sm">Total Articole</p>
-                  <p className="text-3xl font-bold text-white">{stats.total_articles}</p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-purple-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[#71717A] text-sm">Site-uri Conectate</p>
-                  <p className="text-3xl font-bold text-white">{stats.total_sites}</p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <Globe className="w-6 h-6 text-orange-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Revenue Stats */}
-      {stats && (
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-[#00E676]" />
-                </div>
-                <div>
-                  <p className="text-[#71717A] text-sm">Venit Lunar Estimat</p>
-                  <p className="text-2xl font-bold text-[#00E676]">{stats.monthly_revenue} EUR</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-500" />
-                </div>
-                <div>
-                  <p className="text-[#71717A] text-sm">Utilizatori in Trial</p>
-                  <p className="text-2xl font-bold text-yellow-500">{stats.trial_users}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#0A0A0A] border-[#262626]">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Activity className="w-6 h-6 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-[#71717A] text-sm">Activi Azi</p>
-                  <p className="text-2xl font-bold text-blue-500">{stats.active_today}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Plan Breakdown */}
-      {stats?.plan_breakdown && (
-        <Card className="bg-[#0A0A0A] border-[#262626]">
-          <CardHeader>
-            <CardTitle className="text-white">Distributie Planuri</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(stats.plan_breakdown).map(([plan, count]) => (
-                <div key={plan} className="bg-[#171717] rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-white">{count}</p>
-                  <p className="text-[#71717A] capitalize">{plan}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Users Table */}
-      <Card className="bg-[#0A0A0A] border-[#262626]">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-white">Utilizatori</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
-              <Input
-                placeholder="Cauta utilizator..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-[#171717] border-[#262626] text-white"
-                data-testid="admin-user-search"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#262626]">
-                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Utilizator</th>
-                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Plan</th>
-                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Status</th>
-                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Articole</th>
-                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Inregistrat</th>
-                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Actiuni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-[#262626] hover:bg-[#171717]">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        {user.role === "admin" && (
-                          <Shield className="w-4 h-4 text-red-400" title="Admin" />
-                        )}
-                        <div>
-                          <p className="text-white font-medium">{user.name || "Fara nume"}</p>
-                          <p className="text-[#71717A] text-sm">{user.email}</p>
+              {/* Plan Breakdown */}
+              {stats?.plan_breakdown && (
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardHeader>
+                    <CardTitle className="text-white">Distributie Planuri</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {Object.entries(stats.plan_breakdown).map(([plan, count]) => (
+                        <div key={plan} className="bg-[#171717] rounded-lg p-4 text-center">
+                          <p className="text-2xl font-bold text-white">{count}</p>
+                          <p className="text-[#71717A] capitalize">{plan}</p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      {getPlanBadge(user.plan)}
-                    </td>
-                    <td className="py-3 px-4">
-                      {getStatusBadge(user.subscription_status)}
-                    </td>
-                    <td className="py-3 px-4 text-white">
-                      {user.articles_count || 0}
-                    </td>
-                    <td className="py-3 px-4 text-[#71717A]">
-                      {user.created_at ? new Date(user.created_at).toLocaleDateString('ro-RO') : '-'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditUser(user)}
-                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
-                          data-testid={`edit-user-${user.id}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleAdminRole(user)}
-                          className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
-                          title={user.role === "admin" ? "Retrage Admin" : "Fa Admin"}
-                          data-testid={`toggle-admin-${user.id}`}
-                        >
-                          <UserCog className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteUser(user)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          data-testid={`delete-user-${user.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#262626]">
-              <p className="text-[#71717A] text-sm">
-                Afisare {(currentPage - 1) * usersPerPage + 1} - {Math.min(currentPage * usersPerPage, filteredUsers.length)} din {filteredUsers.length}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="border-[#262626]"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="border-[#262626]"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        {/* USERS TAB */}
+        <TabsContent value="users" className="mt-6">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Utilizatori ({filteredUsers.length})</CardTitle>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
+                  <Input
+                    placeholder="Cauta utilizator..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-[#171717] border-[#262626] text-white"
+                    data-testid="admin-user-search"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[#262626]">
+                      <th className="text-left py-3 px-4 text-[#71717A] font-normal">Utilizator</th>
+                      <th className="text-left py-3 px-4 text-[#71717A] font-normal">Plan</th>
+                      <th className="text-left py-3 px-4 text-[#71717A] font-normal">Status</th>
+                      <th className="text-left py-3 px-4 text-[#71717A] font-normal">Articole</th>
+                      <th className="text-left py-3 px-4 text-[#71717A] font-normal">Inregistrat</th>
+                      <th className="text-left py-3 px-4 text-[#71717A] font-normal">Actiuni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUsers.map((user) => (
+                      <tr key={user.id} className="border-b border-[#262626] hover:bg-[#171717]">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            {user.role === "admin" && (
+                              <Shield className="w-4 h-4 text-red-400" title="Admin" />
+                            )}
+                            <div>
+                              <p className="text-white font-medium">{user.name || "Fara nume"}</p>
+                              <p className="text-[#71717A] text-sm">{user.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {getPlanBadge(user.plan)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {getStatusBadge(user.subscription_status)}
+                        </td>
+                        <td className="py-3 px-4 text-white">
+                          {user.articles_count || 0}
+                        </td>
+                        <td className="py-3 px-4 text-[#71717A]">
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString('ro-RO') : '-'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditUser(user)}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                              data-testid={`edit-user-${user.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleAdminRole(user)}
+                              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                              title={user.role === "admin" ? "Retrage Admin" : "Fa Admin"}
+                              data-testid={`toggle-admin-${user.id}`}
+                            >
+                              <UserCog className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user)}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              data-testid={`delete-user-${user.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#262626]">
+                  <p className="text-[#71717A] text-sm">
+                    Afisare {(currentPage - 1) * usersPerPage + 1} - {Math.min(currentPage * usersPerPage, filteredUsers.length)} din {filteredUsers.length}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="border-[#262626]"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="border-[#262626]"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* CONTENT TAB */}
+        <TabsContent value="content" className="mt-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Contact Page Editor */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-[#00E676]" />
+                  Pagina Contact
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Editeaza informatiile afisate pe pagina de contact
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <Mail className="w-4 h-4" /> Email
+                  </Label>
+                  <Input
+                    value={contactContent.email}
+                    onChange={(e) => setContactContent({...contactContent, email: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="support@exemplu.ro"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <Phone className="w-4 h-4" /> Telefon
+                  </Label>
+                  <Input
+                    value={contactContent.phone}
+                    onChange={(e) => setContactContent({...contactContent, phone: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="+40 721 234 567"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <MapPin className="w-4 h-4" /> Adresa
+                  </Label>
+                  <Input
+                    value={contactContent.address}
+                    onChange={(e) => setContactContent({...contactContent, address: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="Bucuresti, Romania"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA] flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Program
+                  </Label>
+                  <Input
+                    value={contactContent.hours}
+                    onChange={(e) => setContactContent({...contactContent, hours: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="Luni - Vineri, 9:00 - 18:00"
+                  />
+                </div>
+                
+                <Button 
+                  onClick={saveContactContent}
+                  disabled={savingContent}
+                  className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {savingContent ? "Se salveaza..." : "Salveaza Modificarile"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Preview */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white">Previzualizare</CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Asa vor arata informatiile pe site
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-[#171717] rounded-lg p-4 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                      <Mail className="w-5 h-5 text-[#00E676]" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Email</p>
+                      <p className="text-[#A1A1AA]">{contactContent.email}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                      <Phone className="w-5 h-5 text-[#00E676]" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Telefon</p>
+                      <p className="text-[#A1A1AA]">{contactContent.phone}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-[#00E676]" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Adresa</p>
+                      <p className="text-[#A1A1AA]">{contactContent.address}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-[#00E676]" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Program</p>
+                      <p className="text-[#A1A1AA]">{contactContent.hours}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-[#71717A] text-sm text-center">
+                  Modificarile vor aparea pe pagina /contact dupa salvare
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Edit User Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

@@ -506,3 +506,33 @@ async def generate_invoice_for_transaction(
     )
     
     return invoice
+
+
+
+# ============ PUBLIC CONTENT ROUTES ============
+
+@saas_router.get("/content/{page_id}")
+async def get_public_content(page_id: str):
+    """Get public page content (no auth required)"""
+    db = get_db()
+    
+    if page_id not in ["contact", "terms", "privacy"]:
+        raise HTTPException(status_code=404, detail="Page not found")
+    
+    content = await db.page_content.find_one({"page_id": page_id}, {"_id": 0})
+    
+    if not content:
+        # Return default content
+        defaults = {
+            "contact": {
+                "email": "support@seoautomation.ro",
+                "phone": "+40 721 234 567",
+                "address": "Bucuresti, Romania",
+                "hours": "Luni - Vineri, 9:00 - 18:00"
+            },
+            "terms": {"last_updated": "Martie 2026"},
+            "privacy": {"last_updated": "Martie 2026"}
+        }
+        return {"page_id": page_id, "content": defaults.get(page_id, {})}
+    
+    return content
