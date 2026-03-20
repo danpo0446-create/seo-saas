@@ -2,7 +2,7 @@
 
 ## Original Problem Statement
 Implementare aplicație SaaS pe branch separat conform specificațiilor pentru SEO Automation.
-- **Domeniu**: app.clienti.ro
+- **Domeniu**: app.clienti.ro (production: saas.seamanshelp.com)
 - **Planuri**: Starter €19, Pro €49, Agency €99, Enterprise €199
 - **Trial**: 7 zile gratuit
 - **BYOAK**: Clienții își pun propriile API keys
@@ -17,7 +17,10 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 │   ├── plans.py           # Plan definitions and limits
 │   ├── models.py          # Pydantic models for SaaS
 │   ├── routes.py          # SaaS API routes (subscriptions, checkout, BYOAK)
-│   └── subscription_service.py  # Business logic for subscriptions
+│   ├── admin_routes.py    # Admin API routes (users, stats, actions)
+│   ├── subscription_service.py  # Business logic for subscriptions
+│   ├── email_service.py   # Email notifications (Resend)
+│   └── invoice_service.py # PDF invoice generation
 └── .env                   # Environment variables
 ```
 
@@ -28,43 +31,42 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 │   ├── LandingPage.jsx    # Public landing page at /
 │   ├── PricingPage.jsx    # Pricing comparison at /pricing
 │   ├── BillingPage.jsx    # Billing & BYOAK at /app/billing
+│   ├── AdminDashboard.jsx # Admin panel at /app/admin
+│   ├── ContactPage.jsx    # Contact page at /contact
+│   ├── TermsPage.jsx      # Terms at /terms
+│   ├── PrivacyPage.jsx    # Privacy policy at /privacy
 │   └── ... (existing pages)
 ├── App.js                 # Routes configuration
 └── components/
-    └── DashboardLayout.jsx
+    └── DashboardLayout.jsx # Sidebar with Admin link for admins
 ```
 
 ### Database (MongoDB)
 Collections:
-- `users` - User accounts
+- `users` - User accounts (with `role` field: "user" or "admin")
 - `subscriptions` - Subscription status, plan, limits, usage
 - `user_api_keys` - Encrypted BYOAK keys
 - `payment_transactions` - Stripe payment records
-
-## Core Requirements (Static)
-
-### Subscription Plans
-| Plan       | Price/mo | Sites | Articles/mo | Features                        |
-|------------|----------|-------|-------------|----------------------------------|
-| Starter    | €19      | 1     | 15          | Basic features                   |
-| Pro        | €49      | 5     | 50          | + GSC, Backlinks, Reports        |
-| Agency     | €99      | 20    | 200         | + WooCommerce, Social, Audit     |
-| Enterprise | €199     | ∞     | ∞           | Full access, API, White-label    |
-
-### Trial Configuration
-- Duration: 7 days
-- Features: Pro-level (5 sites, 10 articles)
-- Status: `trialing` → `active` (after payment) or `expired`
-
-### BYOAK (Bring Your Own API Keys)
-- OpenAI API Key (for GPT article generation)
-- Google Gemini API Key (alternative AI)
-- Resend API Key (email notifications)
-- Pexels API Key (article images)
+- `invoices` - Generated invoices
+- `page_content` - Editable footer page content (for admin)
 
 ## What's Been Implemented
 
-### Date: 2026-03-19
+### Date: 2026-03-20 (Latest)
+
+#### Admin Dashboard & Footer Pages ✅
+- Admin Dashboard at `/app/admin` with:
+  - Statistics: Total Users, Active Subscriptions, Total Articles, Sites Connected
+  - Financial: Monthly Revenue, Trial Users, Active Today
+  - Plan Breakdown distribution
+  - User list with search, pagination
+  - Actions: Edit subscription (plan/status), Toggle admin role, Delete user
+- Admin link in sidebar (red color, only visible to admin users)
+- Footer pages: `/contact`, `/terms`, `/privacy`
+- Footer links on Landing Page and Pricing Page
+- Admin email: seamanshelp2021@gmail.com
+
+### Previous Implementation (2026-03-19)
 
 #### SaaS Core
 - ✅ Subscription plans model with limits
@@ -78,31 +80,35 @@ Collections:
 - ✅ Payment status verification
 - ✅ Webhook handler for payment events
 - ✅ Subscription upgrade on successful payment
-- ✅ Billing Portal endpoint (pentru utilizatori cu subscripție activă)
+- ✅ Billing Portal endpoint
+- ✅ Annual billing with 20% discount
 
-#### Analytics Dashboard
-- ✅ ROI & Valoare Estimată card (cost plan, cost/articol, valoare SEO, câștig net)
-- ✅ Stats cards (articole, site-uri, keywords, backlinks)
-- ✅ Utilizare articole cu progress bar
-- ✅ Sumar performanță detailat
-- ✅ API /api/saas/analytics/overview
+#### Analytics & Reporting
+- ✅ ROI & Estimated Value dashboard
+- ✅ Usage analytics
+- ✅ PDF invoice generation
+- ✅ Invoice download
 
 #### Email Notifications (Resend)
-- ✅ Welcome email la înregistrare
-- ✅ Trial reminder (2 zile înainte de expirare)
+- ✅ Welcome email on registration
+- ✅ Trial reminder (2 days before expiration)
 - ✅ Trial expired notification
 - ✅ Payment success confirmation
-- ✅ Scheduler pentru verificare zilnică trial expirations
-- ⚠️ Necesită RESEND_API_KEY în producție
+- ⚠️ Requires RESEND_API_KEY in production
 
-#### Frontend Pages
-- ✅ Landing page with hero, features, pricing preview, testimonials
-- ✅ Pricing page with all 4 plans comparison
-- ✅ Billing page with subscription status and usage
-- ✅ BYOAK tab for API keys configuration
-- ✅ Analytics Dashboard integrat în Dashboard principal
+## API Endpoints
 
-#### API Endpoints
+### Admin Endpoints (require admin role)
+- `GET /api/admin/stats` - Platform statistics
+- `GET /api/admin/users` - List all users with subscription info
+- `GET /api/admin/users/{user_id}` - User details
+- `PATCH /api/admin/users/{user_id}/role` - Change user role
+- `PATCH /api/admin/users/{user_id}/subscription` - Edit subscription
+- `DELETE /api/admin/users/{user_id}` - Delete user and data
+- `GET /api/admin/content` - Get editable page content
+- `PUT /api/admin/content/{page_id}` - Update page content
+
+### SaaS Endpoints
 - `GET /api/saas/plans` - Get all plans
 - `GET /api/saas/subscription` - Get user subscription
 - `GET /api/saas/subscription/usage` - Get usage stats
@@ -110,42 +116,52 @@ Collections:
 - `GET /api/saas/checkout/status/{session_id}` - Check payment
 - `GET /api/saas/api-keys` - Get BYOAK status
 - `PUT /api/saas/api-keys` - Update BYOAK keys
-- `POST /api/webhook/stripe` - Stripe webhook
+- `GET /api/saas/invoices` - List invoices
+- `GET /api/saas/invoices/{id}/pdf` - Download invoice PDF
 
 ## Prioritized Backlog
 
-### P0 (Critical)
-- [ ] Configure production Stripe keys
-- [ ] Setup domain (app.clienti.ro)
-- [ ] Configure RESEND_API_KEY pentru email notifications
+### P0 (Critical) - DONE ✅
+- ✅ Admin Dashboard implementation
+- ✅ Footer pages (Contact, Terms, Privacy)
+- ✅ Admin user management
 
-### P1 (High)
-- ✅ ~~Email notifications on trial expiration~~ DONE
-- ✅ ~~Billing portal integration~~ DONE
-- ✅ ~~Monthly usage reset scheduler~~ DONE
+### P1 (High) - Pending
+- [ ] Configure production Stripe keys on VPS
+- [ ] Configure RESEND_API_KEY on VPS for email notifications
+- [ ] Update contact info in Contact page from admin
 
 ### P2 (Medium)
-- ✅ ~~Annual billing option (20% discount)~~ DONE
-- ✅ ~~Invoice PDF generation~~ DONE
-- ✅ ~~Usage analytics dashboard~~ DONE
 - [ ] Referral program
+- [ ] Team members for Agency/Enterprise plans
 
 ### P3 (Nice to have)
-- [ ] Team members for Agency/Enterprise
 - [ ] API rate limiting per plan
 - [ ] Custom domain white-label
 
-## Next Tasks
-1. Configure production Stripe account
-2. Setup email notifications (Resend) for:
-   - Welcome email on registration
-   - Trial expiration reminder (day 5)
-   - Payment confirmation
-   - Usage limit warnings
-3. Add billing portal for subscription management
-4. Deploy to production domain
+## Test Credentials
 
-## User Personas
-1. **Blogger** - Uses Starter, 1 site, occasional articles
-2. **Freelancer** - Uses Pro, multiple client sites, regular content
-3. **Agency** - Uses Agency/Enterprise, high volume, needs automation
+### Admin Account
+- Email: seamanshelp2021@gmail.com
+- Password: admin123
+- Role: admin
+- Plan: Enterprise
+
+### Test Account
+- Email: test@example.com
+- Password: test123
+- Role: user
+
+## Deployment Notes
+
+### Production (VPS - saas.seamanshelp.com)
+- The `emergentintegrations` library is mocked on VPS
+- Frontend changes require: `npm run build` then restart nginx
+- Backend changes require: `sudo systemctl restart seo-saas`
+- SSL configured with Certbot
+
+### Environment Variables Needed for Production
+```
+STRIPE_API_KEY=sk_live_... (production key)
+RESEND_API_KEY=re_... (production key)
+```
