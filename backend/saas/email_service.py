@@ -308,7 +308,7 @@ class EmailService:
     def __init__(self):
         self.api_key = os.environ.get('RESEND_API_KEY')
         self.sender_email = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-        self.frontend_url = os.environ.get('FRONTEND_URL', 'https://seo-automation-saas.preview.emergentagent.com')
+        self.frontend_url = os.environ.get('FRONTEND_URL', 'https://saas-staging-dev.preview.emergentagent.com')
         
         if self.api_key and RESEND_AVAILABLE:
             resend.api_key = self.api_key

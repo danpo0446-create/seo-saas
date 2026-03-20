@@ -364,9 +364,9 @@ const LandingPage = () => {
               <span className="text-lg font-bold text-white">SEO Automation</span>
             </div>
             <div className="flex gap-8 text-[#71717A] text-sm">
-              <a href="#" className="hover:text-white transition-colors">Termeni și Condiții</a>
-              <a href="#" className="hover:text-white transition-colors">Confidențialitate</a>
-              <a href="#" className="hover:text-white transition-colors">Contact</a>
+              <Link to="/terms" className="hover:text-white transition-colors">Termeni și Condiții</Link>
+              <Link to="/privacy" className="hover:text-white transition-colors">Confidențialitate</Link>
+              <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
             </div>
             <div className="text-[#71717A] text-sm">
               © 2026 SEO Automation. Toate drepturile rezervate.

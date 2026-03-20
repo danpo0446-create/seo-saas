@@ -1,0 +1,560 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Users, FileText, Globe, CreditCard, TrendingUp, Activity,
+  Search, ChevronLeft, ChevronRight, Eye, Trash2, Shield,
+  Clock, Mail, Calendar, Edit, UserCog, Ban, AlertTriangle
+} from "lucide-react";
+import axios from "axios";
+import { toast } from "sonner";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const AdminDashboard = () => {
+  const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 10;
+
+  // Dialog states
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editPlan, setEditPlan] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const [statsRes, usersRes] = await Promise.all([
+        axios.get(`${API}/admin/stats`, { headers }),
+        axios.get(`${API}/admin/users`, { headers })
+      ]);
+      
+      setStats(statsRes.data);
+      setUsers(usersRes.data);
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+      if (error.response?.status === 403) {
+        toast.error("Nu ai permisiuni de administrator");
+      } else {
+        toast.error("Eroare la incarcarea datelor");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user);
+    setEditPlan(user.plan || "free");
+    setEditStatus(user.subscription_status || "expired");
+    setShowEditDialog(true);
+  };
+
+  const handleDeleteUser = (user) => {
+    setSelectedUser(user);
+    setShowDeleteDialog(true);
+  };
+
+  const saveUserChanges = async () => {
+    if (!selectedUser) return;
+    setActionLoading(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.patch(
+        `${API}/admin/users/${selectedUser.id}/subscription`,
+        { plan: editPlan, status: editStatus },
+        { headers }
+      );
+      
+      toast.success("Modificarile au fost salvate");
+      setShowEditDialog(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la salvare");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+    setActionLoading(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.delete(`${API}/admin/users/${selectedUser.id}`, { headers });
+      
+      toast.success("Utilizatorul a fost sters");
+      setShowDeleteDialog(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la stergere");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const toggleAdminRole = async (user) => {
+    const newRole = user.role === "admin" ? "user" : "admin";
+    
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.patch(
+        `${API}/admin/users/${user.id}/role`,
+        { role: newRole },
+        { headers }
+      );
+      
+      toast.success(`Rol schimbat la ${newRole}`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la schimbarea rolului");
+    }
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * usersPerPage,
+    currentPage * usersPerPage
+  );
+
+  const getStatusBadge = (status) => {
+    const config = {
+      active: { label: "Activ", className: "bg-[#00E676]/10 text-[#00E676]" },
+      trialing: { label: "Trial", className: "bg-yellow-500/10 text-yellow-500" },
+      expired: { label: "Expirat", className: "bg-red-500/10 text-red-500" },
+      canceled: { label: "Anulat", className: "bg-gray-500/10 text-gray-500" }
+    };
+    const c = config[status] || config.expired;
+    return <Badge className={c.className}>{c.label}</Badge>;
+  };
+
+  const getPlanBadge = (plan) => {
+    const colors = {
+      starter: "bg-blue-500/10 text-blue-400",
+      pro: "bg-purple-500/10 text-purple-400",
+      agency: "bg-orange-500/10 text-orange-400",
+      enterprise: "bg-[#00E676]/10 text-[#00E676]",
+      free: "bg-gray-500/10 text-gray-400"
+    };
+    return (
+      <Badge className={colors[plan] || colors.free}>
+        {plan?.charAt(0).toUpperCase() + plan?.slice(1) || "Free"}
+      </Badge>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00E676]"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="admin-dashboard">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <Shield className="w-8 h-8 text-[#00E676]" />
+            Admin Dashboard
+          </h1>
+          <p className="text-[#71717A] mt-1">Gestioneaza utilizatorii si monitorizeaza platforma</p>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#71717A] text-sm">Total Utilizatori</p>
+                  <p className="text-3xl font-bold text-white">{stats.total_users}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#71717A] text-sm">Subscriptii Active</p>
+                  <p className="text-3xl font-bold text-white">{stats.active_subscriptions}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 text-[#00E676]" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#71717A] text-sm">Total Articole</p>
+                  <p className="text-3xl font-bold text-white">{stats.total_articles}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-purple-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#71717A] text-sm">Site-uri Conectate</p>
+                  <p className="text-3xl font-bold text-white">{stats.total_sites}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Globe className="w-6 h-6 text-orange-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Revenue Stats */}
+      {stats && (
+        <div className="grid md:grid-cols-3 gap-4">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-[#00E676]/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-[#00E676]" />
+                </div>
+                <div>
+                  <p className="text-[#71717A] text-sm">Venit Lunar Estimat</p>
+                  <p className="text-2xl font-bold text-[#00E676]">{stats.monthly_revenue} EUR</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-yellow-500" />
+                </div>
+                <div>
+                  <p className="text-[#71717A] text-sm">Utilizatori in Trial</p>
+                  <p className="text-2xl font-bold text-yellow-500">{stats.trial_users}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Activity className="w-6 h-6 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-[#71717A] text-sm">Activi Azi</p>
+                  <p className="text-2xl font-bold text-blue-500">{stats.active_today}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Plan Breakdown */}
+      {stats?.plan_breakdown && (
+        <Card className="bg-[#0A0A0A] border-[#262626]">
+          <CardHeader>
+            <CardTitle className="text-white">Distributie Planuri</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(stats.plan_breakdown).map(([plan, count]) => (
+                <div key={plan} className="bg-[#171717] rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-white">{count}</p>
+                  <p className="text-[#71717A] capitalize">{plan}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Users Table */}
+      <Card className="bg-[#0A0A0A] border-[#262626]">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-white">Utilizatori</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
+              <Input
+                placeholder="Cauta utilizator..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-[#171717] border-[#262626] text-white"
+                data-testid="admin-user-search"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#262626]">
+                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Utilizator</th>
+                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Plan</th>
+                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Status</th>
+                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Articole</th>
+                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Inregistrat</th>
+                  <th className="text-left py-3 px-4 text-[#71717A] font-normal">Actiuni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedUsers.map((user) => (
+                  <tr key={user.id} className="border-b border-[#262626] hover:bg-[#171717]">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        {user.role === "admin" && (
+                          <Shield className="w-4 h-4 text-red-400" title="Admin" />
+                        )}
+                        <div>
+                          <p className="text-white font-medium">{user.name || "Fara nume"}</p>
+                          <p className="text-[#71717A] text-sm">{user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      {getPlanBadge(user.plan)}
+                    </td>
+                    <td className="py-3 px-4">
+                      {getStatusBadge(user.subscription_status)}
+                    </td>
+                    <td className="py-3 px-4 text-white">
+                      {user.articles_count || 0}
+                    </td>
+                    <td className="py-3 px-4 text-[#71717A]">
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString('ro-RO') : '-'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditUser(user)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                          data-testid={`edit-user-${user.id}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleAdminRole(user)}
+                          className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                          title={user.role === "admin" ? "Retrage Admin" : "Fa Admin"}
+                          data-testid={`toggle-admin-${user.id}`}
+                        >
+                          <UserCog className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          data-testid={`delete-user-${user.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#262626]">
+              <p className="text-[#71717A] text-sm">
+                Afisare {(currentPage - 1) * usersPerPage + 1} - {Math.min(currentPage * usersPerPage, filteredUsers.length)} din {filteredUsers.length}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="border-[#262626]"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="border-[#262626]"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="bg-[#0A0A0A] border-[#262626]">
+          <DialogHeader>
+            <DialogTitle className="text-white">Editeaza Utilizator</DialogTitle>
+            <DialogDescription className="text-[#71717A]">
+              {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[#A1A1AA]">Plan</Label>
+              <Select value={editPlan} onValueChange={setEditPlan}>
+                <SelectTrigger className="bg-[#171717] border-[#262626] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#171717] border-[#262626]">
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="starter">Starter - 19 EUR</SelectItem>
+                  <SelectItem value="pro">Pro - 49 EUR</SelectItem>
+                  <SelectItem value="agency">Agency - 99 EUR</SelectItem>
+                  <SelectItem value="enterprise">Enterprise - 199 EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-[#A1A1AA]">Status Subscriptie</Label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger className="bg-[#171717] border-[#262626] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#171717] border-[#262626]">
+                  <SelectItem value="active">Activ</SelectItem>
+                  <SelectItem value="trialing">Trial</SelectItem>
+                  <SelectItem value="canceled">Anulat</SelectItem>
+                  <SelectItem value="expired">Expirat</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              className="border-[#262626]"
+            >
+              Anuleaza
+            </Button>
+            <Button
+              onClick={saveUserChanges}
+              disabled={actionLoading}
+              className="bg-[#00E676] text-black hover:bg-[#00E676]/90"
+            >
+              {actionLoading ? "Se salveaza..." : "Salveaza"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="bg-[#0A0A0A] border-[#262626]">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              Sterge Utilizator
+            </DialogTitle>
+            <DialogDescription className="text-[#71717A]">
+              Esti sigur ca vrei sa stergi utilizatorul <strong className="text-white">{selectedUser?.email}</strong>?
+              Aceasta actiune va sterge toate datele asociate si nu poate fi anulata.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              className="border-[#262626]"
+            >
+              Anuleaza
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteUser}
+              disabled={actionLoading}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {actionLoading ? "Se sterge..." : "Sterge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default AdminDashboard;

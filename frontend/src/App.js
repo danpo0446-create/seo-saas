@@ -24,6 +24,10 @@ import ReportsPage from "@/pages/ReportsPage";
 import LandingPage from "@/pages/LandingPage";
 import PricingPage from "@/pages/PricingPage";
 import BillingPage from "@/pages/BillingPage";
+import ContactPage from "@/pages/ContactPage";
+import TermsPage from "@/pages/TermsPage";
+import PrivacyPage from "@/pages/PrivacyPage";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -104,7 +108,13 @@ function App() {
               <Route path="indexing" element={<IndexingPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="billing" element={<BillingPage />} />
+              <Route path="admin" element={<AdminDashboard />} />
             </Route>
+            
+            {/* Footer pages - public */}
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             
             {/* Legacy routes redirect */}
             <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />

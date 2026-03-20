@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 class SaasBackendTester:
-    def __init__(self, base_url="https://seo-automation-saas.preview.emergentagent.com"):
+    def __init__(self, base_url="https://saas-staging-dev.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.tests_run = 0

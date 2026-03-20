@@ -456,10 +456,17 @@ const PricingPage = () => {
 
       {/* Footer */}
       <footer className="py-12 px-4 border-t border-[#262626]">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-[#71717A] text-sm">
-            © 2026 SEO Automation. Toate drepturile rezervate.
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex gap-8 text-[#71717A] text-sm">
+              <Link to="/terms" className="hover:text-white transition-colors">Termeni și Condiții</Link>
+              <Link to="/privacy" className="hover:text-white transition-colors">Confidențialitate</Link>
+              <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
+            </div>
+            <p className="text-[#71717A] text-sm">
+              © 2026 SEO Automation. Toate drepturile rezervate.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

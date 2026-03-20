@@ -56,6 +56,7 @@ from google_trends_service import get_trending_topics_for_niche, score_keywords_
 
 # Import SaaS modules
 from saas.routes import saas_router
+from saas.admin_routes import admin_router
 from saas.subscription_service import SubscriptionService, ApiKeyService
 from saas.plans import get_plan, PLANS
 
@@ -225,6 +226,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     created_at: str
+    role: Optional[str] = "user"
 
 class ArticleCreate(BaseModel):
     title: str
@@ -537,7 +539,7 @@ async def register(user: UserCreate):
     asyncio.create_task(email_service.send_welcome_email(user.email, user.name))
     
     token = create_token(user_id)
-    return {"token": token, "user": {"id": user_id, "email": user.email, "name": user.name}}
+    return {"token": token, "user": {"id": user_id, "email": user.email, "name": user.name, "role": "user"}}
 
 @api_router.post("/auth/login", response_model=dict)
 async def login(credentials: UserLogin):
@@ -546,7 +548,7 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_token(user["id"])
-    return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user["name"]}}
+    return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user["name"], "role": user.get("role", "user")}}
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(user: dict = Depends(get_current_user)):
@@ -554,7 +556,8 @@ async def get_me(user: dict = Depends(get_current_user)):
         id=user["id"],
         email=user["email"],
         name=user["name"],
-        created_at=user["created_at"]
+        created_at=user["created_at"],
+        role=user.get("role", "user")
     )
 
 # ============ ARTICLES ROUTES ============
@@ -7235,6 +7238,9 @@ app.include_router(api_router)
 
 # Include SaaS router
 app.include_router(saas_router)
+
+# Include Admin router
+app.include_router(admin_router)
 
 app.add_middleware(
     CORSMiddleware,

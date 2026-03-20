@@ -31,7 +31,8 @@ import {
   FileSearch,
   SearchCheck,
   BarChart3,
-  CreditCard
+  CreditCard,
+  Shield
 } from 'lucide-react';
 
 const navItems = [
@@ -171,6 +172,26 @@ export const DashboardLayout = () => {
                   <span className="font-medium">{item.label}</span>
                 </NavLink>
               ))}
+              
+              {/* Admin Dashboard - only for admin users */}
+              {user?.role === 'admin' && (
+                <NavLink
+                  to="/app/admin"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg
+                    transition-colors duration-150
+                    ${isActive 
+                      ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
+                      : 'text-red-400 hover:bg-red-500/10 hover:text-red-400'
+                    }
+                  `}
+                  data-testid="nav-admin"
+                >
+                  <Shield className="w-5 h-5" />
+                  <span className="font-medium">Admin</span>
+                </NavLink>
+              )}
             </nav>
           </ScrollArea>
 
