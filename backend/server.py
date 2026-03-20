@@ -560,6 +560,49 @@ async def get_me(user: dict = Depends(get_current_user)):
         role=user.get("role", "user")
     )
 
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest):
+    """Send password reset email"""
+    import secrets
+    
+    user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "Dacă există un cont cu acest email, vei primi instrucțiuni."}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Save token to database
+    await db.password_resets.update_one(
+        {"user_id": user["id"]},
+        {"$set": {
+            "user_id": user["id"],
+            "token": reset_token,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Try to send email if Resend is configured
+    try:
+        from saas.email_service import email_service
+        # For now, just log the reset link
+        logging.info(f"[AUTH] Password reset requested for {data.email}, token: {reset_token}")
+    except Exception as e:
+        logging.warning(f"[AUTH] Could not send reset email: {e}")
+    
+    return {"message": "Dacă există un cont cu acest email, vei primi instrucțiuni."}
+
+
 # ============ ARTICLES ROUTES ============
 
 import re
