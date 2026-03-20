@@ -11,10 +11,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 import jwt
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from .plans import PLANS
 
-# JWT Config
+# JWT Config - read from environment, same as server.py
 JWT_SECRET = os.environ.get('JWT_SECRET', 'seo-automation-secret-key-2024')
 JWT_ALGORITHM = "HS256"
 

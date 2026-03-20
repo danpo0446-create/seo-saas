@@ -55,7 +55,21 @@ const AdminDashboard = () => {
     address: "Bucuresti, Romania",
     hours: "Luni - Vineri, 9:00 - 18:00"
   });
+  const [termsContent, setTermsContent] = useState({
+    company_name: "SEO Automation SRL",
+    company_address: "Bucuresti, Romania",
+    company_email: "legal@seoautomation.ro",
+    last_updated: "Martie 2026"
+  });
+  const [privacyContent, setPrivacyContent] = useState({
+    company_name: "SEO Automation SRL",
+    company_email: "privacy@seoautomation.ro",
+    data_retention: "2 ani",
+    last_updated: "Martie 2026"
+  });
   const [savingContent, setSavingContent] = useState(false);
+  const [savingTerms, setSavingTerms] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -92,9 +106,20 @@ const AdminDashboard = () => {
       const headers = { Authorization: `Bearer ${token}` };
       
       const res = await axios.get(`${API}/admin/content`, { headers });
+      
       const contactData = res.data.find(c => c.page_id === "contact");
       if (contactData?.content) {
         setContactContent(contactData.content);
+      }
+      
+      const termsData = res.data.find(c => c.page_id === "terms");
+      if (termsData?.content) {
+        setTermsContent(termsData.content);
+      }
+      
+      const privacyData = res.data.find(c => c.page_id === "privacy");
+      if (privacyData?.content) {
+        setPrivacyContent(privacyData.content);
       }
     } catch (error) {
       console.log("Using default content");
@@ -113,6 +138,36 @@ const AdminDashboard = () => {
       toast.error("Eroare la salvarea continutului");
     } finally {
       setSavingContent(false);
+    }
+  };
+
+  const saveTermsContent = async () => {
+    setSavingTerms(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.put(`${API}/admin/content/terms`, termsContent, { headers });
+      toast.success("Termenii au fost salvati!");
+    } catch (error) {
+      toast.error("Eroare la salvarea termenilor");
+    } finally {
+      setSavingTerms(false);
+    }
+  };
+
+  const savePrivacyContent = async () => {
+    setSavingPrivacy(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.put(`${API}/admin/content/privacy`, privacyContent, { headers });
+      toast.success("Politica de confidentialitate a fost salvata!");
+    } catch (error) {
+      toast.error("Eroare la salvare");
+    } finally {
+      setSavingPrivacy(false);
     }
   };
 
@@ -647,6 +702,122 @@ const AdminDashboard = () => {
                 <p className="text-[#71717A] text-sm text-center">
                   Modificarile vor aparea pe pagina /contact dupa salvare
                 </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Terms and Privacy Editors */}
+          <div className="grid md:grid-cols-2 gap-6 mt-6">
+            {/* Terms Page Editor */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-500" />
+                  Termeni si Conditii
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Editeaza informatiile din pagina Termeni
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Nume Companie</Label>
+                  <Input
+                    value={termsContent.company_name}
+                    onChange={(e) => setTermsContent({...termsContent, company_name: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Adresa Companie</Label>
+                  <Input
+                    value={termsContent.company_address}
+                    onChange={(e) => setTermsContent({...termsContent, company_address: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Email Legal</Label>
+                  <Input
+                    value={termsContent.company_email}
+                    onChange={(e) => setTermsContent({...termsContent, company_email: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Ultima Actualizare</Label>
+                  <Input
+                    value={termsContent.last_updated}
+                    onChange={(e) => setTermsContent({...termsContent, last_updated: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="Martie 2026"
+                  />
+                </div>
+                <Button 
+                  onClick={saveTermsContent}
+                  disabled={savingTerms}
+                  className="w-full bg-blue-500 text-white hover:bg-blue-600"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {savingTerms ? "Se salveaza..." : "Salveaza Termeni"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Privacy Page Editor */}
+            <Card className="bg-[#0A0A0A] border-[#262626]">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-purple-500" />
+                  Politica Confidentialitate
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Editeaza informatiile din pagina Privacy
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Nume Companie</Label>
+                  <Input
+                    value={privacyContent.company_name}
+                    onChange={(e) => setPrivacyContent({...privacyContent, company_name: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Email Privacy</Label>
+                  <Input
+                    value={privacyContent.company_email}
+                    onChange={(e) => setPrivacyContent({...privacyContent, company_email: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Perioada Retentie Date</Label>
+                  <Input
+                    value={privacyContent.data_retention}
+                    onChange={(e) => setPrivacyContent({...privacyContent, data_retention: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="2 ani"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#A1A1AA]">Ultima Actualizare</Label>
+                  <Input
+                    value={privacyContent.last_updated}
+                    onChange={(e) => setPrivacyContent({...privacyContent, last_updated: e.target.value})}
+                    className="bg-[#171717] border-[#262626] text-white"
+                    placeholder="Martie 2026"
+                  />
+                </div>
+                <Button 
+                  onClick={savePrivacyContent}
+                  disabled={savingPrivacy}
+                  className="w-full bg-purple-500 text-white hover:bg-purple-600"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {savingPrivacy ? "Se salveaza..." : "Salveaza Privacy"}
+                </Button>
               </CardContent>
             </Card>
           </div>

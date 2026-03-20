@@ -1,8 +1,34 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import axios from "axios";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const TermsPage = () => {
+  const [content, setContent] = useState({
+    company_name: "SEO Automation SRL",
+    company_address: "Bucuresti, Romania",
+    company_email: "legal@seoautomation.ro",
+    last_updated: "Martie 2026"
+  });
+
+  useEffect(() => {
+    fetchContent();
+  }, []);
+
+  const fetchContent = async () => {
+    try {
+      const res = await axios.get(`${API}/saas/content/terms`);
+      if (res.data?.content) {
+        setContent(res.data.content);
+      }
+    } catch (error) {
+      console.log("Using default terms content");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#050505]">
       {/* Navigation */}
@@ -17,7 +43,7 @@ const TermsPage = () => {
             </Link>
             <Link to="/register">
               <Button className="bg-[#00E676] text-black hover:bg-[#00E676]/90">
-                Începe Gratuit
+                Incepe Gratuit
               </Button>
             </Link>
           </div>
@@ -26,18 +52,18 @@ const TermsPage = () => {
 
       <div className="pt-32 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-8">Termeni și Condiții</h1>
+          <h1 className="text-4xl font-bold text-white mb-8">Termeni si Conditii</h1>
           
           <div className="prose prose-invert max-w-none space-y-6 text-[#A1A1AA]">
             <p className="text-lg">
-              Ultima actualizare: Martie 2026
+              Ultima actualizare: {content.last_updated}
             </p>
 
             <section className="space-y-4">
               <h2 className="text-2xl font-semibold text-white">1. Acceptarea Termenilor</h2>
               <p>
-                Prin accesarea și utilizarea platformei SEO Automation, acceptați să fiți obligat de acești 
-                Termeni și Condiții. Dacă nu sunteți de acord cu oricare parte a termenilor, nu puteți 
+                Prin accesarea si utilizarea platformei {content.company_name}, acceptati sa fiti obligat de acesti 
+                Termeni si Conditii. Daca nu sunteti de acord cu oricare parte a termenilor, nu puteti 
                 accesa serviciul.
               </p>
             </section>
@@ -45,82 +71,58 @@ const TermsPage = () => {
             <section className="space-y-4">
               <h2 className="text-2xl font-semibold text-white">2. Descrierea Serviciului</h2>
               <p>
-                SEO Automation oferă o platformă SaaS pentru automatizarea proceselor de SEO, inclusiv:
+                {content.company_name} ofera o platforma SaaS pentru automatizarea proceselor de SEO, inclusiv:
               </p>
               <ul className="list-disc pl-6 space-y-2">
-                <li>Generarea de articole optimizate pentru SEO folosind inteligență artificială</li>
-                <li>Publicarea automată pe site-uri WordPress</li>
-                <li>Cercetarea și analiza cuvintelor cheie</li>
+                <li>Generarea de articole optimizate pentru SEO folosind inteligenta artificiala</li>
+                <li>Publicarea automata pe site-uri WordPress</li>
+                <li>Cercetarea si analiza cuvintelor cheie</li>
                 <li>Managementul calendarului editorial</li>
-                <li>Monitorizarea și raportarea performanței SEO</li>
+                <li>Monitorizarea si raportarea performantei SEO</li>
               </ul>
             </section>
 
             <section className="space-y-4">
               <h2 className="text-2xl font-semibold text-white">3. Conturi de Utilizator</h2>
               <p>
-                Pentru a utiliza serviciile noastre, trebuie să creați un cont. Sunteți responsabil pentru:
-              </p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Menținerea confidențialității datelor de autentificare</li>
-                <li>Toate activitățile care au loc sub contul dumneavoastră</li>
-                <li>Notificarea imediată în cazul oricărei utilizări neautorizate</li>
-              </ul>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">4. Planuri și Plăți</h2>
-              <p>
-                Oferim mai multe planuri de abonament cu diferite funcționalități și limite. Plățile sunt 
-                procesate prin Stripe și sunt recurente (lunare sau anuale). Puteți anula abonamentul 
-                oricând, iar accesul va continua până la sfârșitul perioadei plătite.
+                Pentru a utiliza serviciile noastre, trebuie sa creati un cont. Sunteti responsabil pentru
+                mentinerea confidentialitatii contului si parolei si pentru restrictionarea accesului la computer.
               </p>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">5. Utilizare Acceptabilă</h2>
+              <h2 className="text-2xl font-semibold text-white">4. Planuri si Plati</h2>
               <p>
-                Nu aveți voie să utilizați serviciul pentru:
-              </p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Activități ilegale sau frauduloase</li>
-                <li>Generarea de conținut care încalcă drepturile de autor</li>
-                <li>Spam sau conținut malițios</li>
-                <li>Încercări de a compromite securitatea platformei</li>
-              </ul>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">6. Proprietate Intelectuală</h2>
-              <p>
-                Conținutul generat prin platforma noastră vă aparține. Cu toate acestea, platforma, 
-                design-ul, codul și tehnologia subiacentă rămân proprietatea SEO Automation.
+                Oferim mai multe planuri de abonament cu diferite caracteristici si limite. Platile sunt 
+                procesate securizat prin Stripe. Puteti anula abonamentul in orice moment din contul dvs.
               </p>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">7. Limitarea Răspunderii</h2>
+              <h2 className="text-2xl font-semibold text-white">5. Proprietate Intelectuala</h2>
               <p>
-                SEO Automation nu este răspunzătoare pentru daune indirecte, incidentale sau consecvente 
-                rezultate din utilizarea sau imposibilitatea de a utiliza serviciul.
+                Continutul generat folosind platforma noastra va apartine. Totusi, {content.company_name} isi 
+                rezerva dreptul de a utiliza date anonimizate pentru imbunatatirea serviciilor.
               </p>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">8. Modificări ale Termenilor</h2>
+              <h2 className="text-2xl font-semibold text-white">6. Limitarea Raspunderii</h2>
               <p>
-                Ne rezervăm dreptul de a modifica acești termeni în orice moment. Modificările vor fi 
-                comunicate prin email și/sau prin notificare pe platformă.
+                {content.company_name} nu va fi raspunzator pentru daune indirecte, incidentale, speciale sau 
+                consecvente rezultate din utilizarea sau incapacitatea de a utiliza serviciul.
               </p>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">9. Contact</h2>
+              <h2 className="text-2xl font-semibold text-white">7. Contact</h2>
               <p>
-                Pentru întrebări despre acești termeni, contactați-ne la: 
-                <a href="mailto:legal@seoautomation.ro" className="text-[#00E676] hover:underline ml-1">
-                  legal@seoautomation.ro
-                </a>
+                Pentru intrebari despre acesti Termeni si Conditii, ne puteti contacta la:
+              </p>
+              <p>
+                <strong className="text-white">{content.company_name}</strong><br />
+                {content.company_address}<br />
+                Email: {content.company_email}
               </p>
             </section>
           </div>
@@ -129,10 +131,16 @@ const TermsPage = () => {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-[#262626]">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-[#71717A] text-sm">
-            © 2026 SEO Automation. Toate drepturile rezervate.
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex gap-6 text-[#71717A] text-sm">
+              <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
+              <Link to="/privacy" className="hover:text-white transition-colors">Confidentialitate</Link>
+            </div>
+            <p className="text-[#71717A] text-sm">
+              © 2026 {content.company_name}. Toate drepturile rezervate.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

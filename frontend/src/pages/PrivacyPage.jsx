@@ -1,8 +1,34 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import axios from "axios";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PrivacyPage = () => {
+  const [content, setContent] = useState({
+    company_name: "SEO Automation SRL",
+    company_email: "privacy@seoautomation.ro",
+    data_retention: "2 ani",
+    last_updated: "Martie 2026"
+  });
+
+  useEffect(() => {
+    fetchContent();
+  }, []);
+
+  const fetchContent = async () => {
+    try {
+      const res = await axios.get(`${API}/saas/content/privacy`);
+      if (res.data?.content) {
+        setContent(res.data.content);
+      }
+    } catch (error) {
+      console.log("Using default privacy content");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#050505]">
       {/* Navigation */}
@@ -17,7 +43,7 @@ const PrivacyPage = () => {
             </Link>
             <Link to="/register">
               <Button className="bg-[#00E676] text-black hover:bg-[#00E676]/90">
-                Începe Gratuit
+                Incepe Gratuit
               </Button>
             </Link>
           </div>
@@ -26,107 +52,96 @@ const PrivacyPage = () => {
 
       <div className="pt-32 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-8">Politica de Confidențialitate</h1>
+          <h1 className="text-4xl font-bold text-white mb-8">Politica de Confidentialitate</h1>
           
           <div className="prose prose-invert max-w-none space-y-6 text-[#A1A1AA]">
             <p className="text-lg">
-              Ultima actualizare: Martie 2026
+              Ultima actualizare: {content.last_updated}
             </p>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">1. Introducere</h2>
+              <h2 className="text-2xl font-semibold text-white">1. Informatii pe care le Colectam</h2>
               <p>
-                SEO Automation respectă confidențialitatea dumneavoastră și se angajează să protejeze 
-                datele personale. Această politică explică cum colectăm, utilizăm și protejăm informațiile 
-                dumneavoastră.
+                {content.company_name} colecteaza urmatoarele tipuri de informatii:
+              </p>
+              <ul className="list-disc pl-6 space-y-2">
+                <li><strong className="text-white">Informatii de cont:</strong> Nume, adresa de email, parola criptata</li>
+                <li><strong className="text-white">Date de utilizare:</strong> Articole create, site-uri conectate, activitate pe platforma</li>
+                <li><strong className="text-white">Informatii de plata:</strong> Procesate securizat prin Stripe (nu stocam datele cardului)</li>
+                <li><strong className="text-white">Chei API:</strong> Daca alegeti sa folositi propriile chei API, acestea sunt criptate</li>
+              </ul>
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-2xl font-semibold text-white">2. Cum Folosim Informatiile</h2>
+              <p>
+                Folosim informatiile colectate pentru:
+              </p>
+              <ul className="list-disc pl-6 space-y-2">
+                <li>Furnizarea si imbunatatirea serviciilor noastre</li>
+                <li>Procesarea platilor si gestionarea abonamentelor</li>
+                <li>Comunicarea cu dvs. despre cont si servicii</li>
+                <li>Detectarea si prevenirea fraudelor</li>
+              </ul>
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-2xl font-semibold text-white">3. Partajarea Datelor</h2>
+              <p>
+                Nu vindem datele dvs. personale. Partajam informatii doar cu:
+              </p>
+              <ul className="list-disc pl-6 space-y-2">
+                <li><strong className="text-white">Procesatori de plati:</strong> Stripe pentru procesarea platilor</li>
+                <li><strong className="text-white">Furnizori de servicii:</strong> Necesari pentru functionarea platformei</li>
+                <li><strong className="text-white">Autoritati legale:</strong> Cand suntem obligati prin lege</li>
+              </ul>
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-2xl font-semibold text-white">4. Retentia Datelor</h2>
+              <p>
+                Pastram datele dvs. cat timp aveti un cont activ sau conform cerintelor legale. 
+                Perioada standard de retentie este de <strong className="text-white">{content.data_retention}</strong> dupa 
+                inchiderea contului.
               </p>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">2. Date Colectate</h2>
-              <p>Colectăm următoarele tipuri de date:</p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li><strong>Date de cont:</strong> Nume, email, parolă (criptată)</li>
-                <li><strong>Date de utilizare:</strong> Articole generate, site-uri conectate, activitate pe platformă</li>
-                <li><strong>Date tehnice:</strong> Adresă IP, tip browser, dispozitiv</li>
-                <li><strong>Date de plată:</strong> Procesate securizat prin Stripe (nu stocăm date de card)</li>
-              </ul>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">3. Utilizarea Datelor</h2>
-              <p>Utilizăm datele pentru:</p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Furnizarea și îmbunătățirea serviciilor</li>
-                <li>Procesarea plăților și gestionarea abonamentelor</li>
-                <li>Comunicarea cu dumneavoastră (suport, notificări)</li>
-                <li>Analiza utilizării pentru îmbunătățirea platformei</li>
-                <li>Prevenirea fraudei și asigurarea securității</li>
-              </ul>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">4. Partajarea Datelor</h2>
+              <h2 className="text-2xl font-semibold text-white">5. Drepturile Dvs.</h2>
               <p>
-                Nu vindem datele dumneavoastră. Partajăm date doar cu:
+                Aveti dreptul sa:
               </p>
               <ul className="list-disc pl-6 space-y-2">
-                <li><strong>Stripe:</strong> Pentru procesarea plăților</li>
-                <li><strong>Furnizori de servicii:</strong> Care ne ajută să operăm platforma</li>
-                <li><strong>Autorități:</strong> Când suntem obligați legal</li>
+                <li>Accesati datele dvs. personale</li>
+                <li>Corectati informatiile inexacte</li>
+                <li>Solicitati stergerea datelor</li>
+                <li>Exportati datele dvs.</li>
+                <li>Va opuneti procesarii in anumite circumstante</li>
               </ul>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">5. Securitatea Datelor</h2>
+              <h2 className="text-2xl font-semibold text-white">6. Securitate</h2>
               <p>
-                Implementăm măsuri de securitate standard în industrie:
+                Implementam masuri tehnice si organizationale pentru a proteja datele dvs., inclusiv:
               </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Criptare SSL/TLS pentru toate conexiunile</li>
-                <li>Parole criptate cu algoritmi siguri</li>
-                <li>Chei API criptate în baza de date</li>
-                <li>Backup-uri regulate și monitorizare continuă</li>
+                <li>Criptarea parolelor si cheilor API</li>
+                <li>Acces restrictionat la date pe baza de rol</li>
+                <li>Monitorizare continua a securitatii</li>
               </ul>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">6. Drepturile Dumneavoastră (GDPR)</h2>
-              <p>Aveți dreptul să:</p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Accesați datele personale pe care le deținem</li>
-                <li>Corectați datele inexacte</li>
-                <li>Solicitați ștergerea datelor</li>
-                <li>Exportați datele într-un format portabil</li>
-                <li>Vă opuneți procesării în anumite circumstanțe</li>
-              </ul>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">7. Cookie-uri</h2>
+              <h2 className="text-2xl font-semibold text-white">7. Contact</h2>
               <p>
-                Utilizăm cookie-uri esențiale pentru funcționarea platformei și cookie-uri de analiză 
-                pentru a înțelege cum este utilizat serviciul. Puteți controla cookie-urile din setările 
-                browser-ului.
+                Pentru intrebari despre aceasta Politica de Confidentialitate sau pentru a va exercita 
+                drepturile, contactati-ne la:
               </p>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">8. Retenția Datelor</h2>
               <p>
-                Păstrăm datele atât timp cât aveți un cont activ sau cât este necesar pentru a furniza 
-                serviciile. După ștergerea contului, datele sunt eliminate în termen de 30 de zile, cu 
-                excepția cazurilor în care legea impune păstrarea lor.
-              </p>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold text-white">9. Contact</h2>
-              <p>
-                Pentru întrebări despre confidențialitate sau pentru a vă exercita drepturile:
-                <a href="mailto:privacy@seoautomation.ro" className="text-[#00E676] hover:underline ml-1">
-                  privacy@seoautomation.ro
-                </a>
+                <strong className="text-white">{content.company_name}</strong><br />
+                Email: {content.company_email}
               </p>
             </section>
           </div>
@@ -135,10 +150,16 @@ const PrivacyPage = () => {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-[#262626]">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-[#71717A] text-sm">
-            © 2026 SEO Automation. Toate drepturile rezervate.
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex gap-6 text-[#71717A] text-sm">
+              <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
+              <Link to="/terms" className="hover:text-white transition-colors">Termeni</Link>
+            </div>
+            <p className="text-[#71717A] text-sm">
+              © 2026 {content.company_name}. Toate drepturile rezervate.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
