@@ -434,8 +434,8 @@ async def update_platform_settings(data: PlatformSettingsUpdate, admin: dict = D
     update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
     
     if data.stripe_secret_key:
-        if not data.stripe_secret_key.startswith("sk_"):
-            raise HTTPException(status_code=400, detail="Secret Key Stripe trebuie să înceapă cu 'sk_'")
+        if not (data.stripe_secret_key.startswith("sk_") or data.stripe_secret_key.startswith("rk_")):
+            raise HTTPException(status_code=400, detail="Secret Key Stripe trebuie să înceapă cu 'sk_' sau 'rk_'")
         update_data["stripe_secret_key"] = encrypt_platform_key(data.stripe_secret_key)
     
     if data.stripe_publishable_key:
