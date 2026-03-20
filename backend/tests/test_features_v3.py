@@ -14,7 +14,7 @@ import time
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://saas-staging-dev.preview.emergentagent.com"
+    BASE_URL = "https://login-auth-test.preview.emergentagent.com"
 
 TEST_EMAIL = f"test_iter3_{int(time.time())}@test.com"
 TEST_PASSWORD = "TestPass123!"

@@ -104,9 +104,13 @@ Collections:
 - `GET /api/admin/users/{user_id}` - User details
 - `PATCH /api/admin/users/{user_id}/role` - Change user role
 - `PATCH /api/admin/users/{user_id}/subscription` - Edit subscription
+- `POST /api/admin/users/{user_id}/reset-password` - Reset user password (manual)
 - `DELETE /api/admin/users/{user_id}` - Delete user and data
 - `GET /api/admin/content` - Get editable page content
 - `PUT /api/admin/content/{page_id}` - Update page content
+- `GET /api/admin/platform-settings` - Get platform API keys status
+- `PUT /api/admin/platform-settings` - Update Stripe/Resend keys
+- `PUT /api/admin/change-password` - Change admin password
 
 ### SaaS Endpoints
 - `GET /api/saas/plans` - Get all plans
@@ -125,6 +129,9 @@ Collections:
 - ✅ Admin Dashboard implementation
 - ✅ Footer pages (Contact, Terms, Privacy)
 - ✅ Admin user management
+- ✅ Buton "Autentificare" funcționează corect → duce la /login
+- ✅ Endpoint resetare manuală parolă utilizator (Admin)
+- ✅ Script deploy.sh pentru automatizare deployment VPS
 
 ### P1 (High) - Pending
 - [ ] Configure production Stripe keys on VPS
@@ -132,8 +139,8 @@ Collections:
 - [ ] Update contact info in Contact page from admin
 
 ### P2 (Medium)
-- [ ] Referral program
 - [ ] Team members for Agency/Enterprise plans
+- [ ] Referral program
 
 ### P3 (Nice to have)
 - [ ] API rate limiting per plan
@@ -159,9 +166,28 @@ Collections:
 - Frontend changes require: `npm run build` then restart nginx
 - Backend changes require: `sudo systemctl restart seo-saas`
 - SSL configured with Certbot
+- **Script deploy.sh**: `/app/deploy.sh` - automatizează deploy-ul
 
 ### Environment Variables Needed for Production
 ```
 STRIPE_API_KEY=sk_live_... (production key)
 RESEND_API_KEY=re_... (production key)
 ```
+
+### Deploy Commands (VPS)
+Pentru deploy rapid, folosește scriptul:
+```bash
+cd /var/www/seo-saas && ./deploy.sh
+```
+
+Sau manual:
+```bash
+cd /var/www/seo-saas && git checkout -- . && git pull origin main && cd frontend && npm run build && sudo systemctl restart seo-saas
+```
+
+## Changelog
+
+### 2026-12 (Curent)
+- ✅ Fix buton "Autentificare" - ruta corectă /login
+- ✅ Endpoint `POST /api/admin/users/{user_id}/reset-password` - resetare manuală parolă
+- ✅ Script `deploy.sh` pentru automatizare deployment VPS
