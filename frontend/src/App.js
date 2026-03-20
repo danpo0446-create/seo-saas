@@ -29,6 +29,7 @@ import TermsPage from "@/pages/TermsPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ApiKeysPage from "@/pages/ApiKeysPage";
+import SetupGuidePage from "@/pages/SetupGuidePage";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -79,6 +80,7 @@ function App() {
             {/* Public Pages */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/ghid-configurare" element={<SetupGuidePage />} />
             <Route path="/login" element={
               <PublicRoute><LoginPage /></PublicRoute>
             } />

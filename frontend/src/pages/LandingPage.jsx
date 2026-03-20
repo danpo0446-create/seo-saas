@@ -229,6 +229,45 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* BYOAK Info Section */}
+      <section className="py-16 px-4 border-t border-[#262626]">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-gradient-to-r from-[#00E676]/5 to-[#0A0A0A] border-[#00E676]/20">
+            <CardContent className="p-8">
+              <div className="flex flex-col md:flex-row items-center gap-8">
+                <div className="flex-1">
+                  <Badge className="mb-3 bg-[#00E676]/10 text-[#00E676]">Transparenta Totala</Badge>
+                  <h3 className="text-2xl font-bold text-white mb-3">
+                    Folosesti propriile tale chei API
+                  </h3>
+                  <p className="text-[#A1A1AA] mb-4">
+                    Platesti direct la OpenAI, Resend, etc. pentru ce consumi. 
+                    Fara comisioane ascunse, control total asupra costurilor.
+                    <span className="text-white"> Costuri extra estimate: €1-10/luna.</span>
+                  </p>
+                  <Link to="/ghid-configurare">
+                    <Button variant="outline" className="border-[#00E676] text-[#00E676] hover:bg-[#00E676]/10">
+                      Vezi Ghidul Complet
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+                <div className="md:w-48 text-center p-6 bg-[#171717] rounded-xl">
+                  <p className="text-[#71717A] text-sm mb-1">Nu vrei sa configurezi?</p>
+                  <p className="text-2xl font-bold text-white mb-2">€79</p>
+                  <p className="text-[#71717A] text-xs">Setup Complet de la noi</p>
+                  <Link to="/ghid-configurare">
+                    <Button size="sm" className="mt-3 bg-[#00E676] text-black hover:bg-[#00E676]/90 text-xs">
+                      Afla mai multe
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing" className="py-20 px-4 bg-[#0A0A0A]">
         <div className="max-w-6xl mx-auto">
