@@ -45,6 +45,7 @@ class UserApiKeysUpdate(BaseModel):
     openai_key: Optional[str] = None
     gemini_key: Optional[str] = None
     resend_key: Optional[str] = None
+    sendgrid_key: Optional[str] = None
     pexels_key: Optional[str] = None
 
 class UserApiKeysResponse(BaseModel):
@@ -54,6 +55,7 @@ class UserApiKeysResponse(BaseModel):
     has_openai_key: bool = False
     has_gemini_key: bool = False
     has_resend_key: bool = False
+    has_sendgrid_key: bool = False
     has_pexels_key: bool = False
     updated_at: Optional[str] = None
 

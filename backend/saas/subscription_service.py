@@ -209,6 +209,7 @@ class ApiKeyService:
                 "has_openai_key": False,
                 "has_gemini_key": False,
                 "has_resend_key": False,
+                "has_sendgrid_key": False,
                 "has_pexels_key": False,
                 "updated_at": None
             }
@@ -219,12 +220,13 @@ class ApiKeyService:
             "has_openai_key": bool(keys.get("openai_key")),
             "has_gemini_key": bool(keys.get("gemini_key")),
             "has_resend_key": bool(keys.get("resend_key")),
+            "has_sendgrid_key": bool(keys.get("sendgrid_key")),
             "has_pexels_key": bool(keys.get("pexels_key")),
             "updated_at": keys.get("updated_at")
         }
     
     async def update_keys(self, user_id: str, openai_key: str = None, gemini_key: str = None,
-                          resend_key: str = None, pexels_key: str = None) -> Dict[str, Any]:
+                          resend_key: str = None, sendgrid_key: str = None, pexels_key: str = None) -> Dict[str, Any]:
         """Update user's API keys"""
         existing = await self.db.user_api_keys.find_one({"user_id": user_id})
         
@@ -236,6 +238,8 @@ class ApiKeyService:
             update_data["gemini_key"] = encrypt_api_key(gemini_key) if gemini_key else ""
         if resend_key is not None:
             update_data["resend_key"] = encrypt_api_key(resend_key) if resend_key else ""
+        if sendgrid_key is not None:
+            update_data["sendgrid_key"] = encrypt_api_key(sendgrid_key) if sendgrid_key else ""
         if pexels_key is not None:
             update_data["pexels_key"] = encrypt_api_key(pexels_key) if pexels_key else ""
         

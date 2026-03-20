@@ -32,7 +32,8 @@ import {
   SearchCheck,
   BarChart3,
   CreditCard,
-  Shield
+  Shield,
+  Key
 } from 'lucide-react';
 
 const navItems = [
@@ -49,6 +50,7 @@ const navItems = [
   { path: '/app/technical-audit', icon: FileSearch, label: 'Audit Tehnic' },
   { path: '/app/business-analysis', icon: Brain, label: 'Analiză Business' },
   { path: '/app/indexing', icon: SearchCheck, label: 'Indexare Google' },
+  { path: '/app/api-keys', icon: Key, label: 'Chei API' },
   { path: '/app/billing', icon: CreditCard, label: 'Facturare' },
   { path: '/app/settings', icon: Settings, label: 'Setări' },
 ];

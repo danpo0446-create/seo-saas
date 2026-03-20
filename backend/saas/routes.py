@@ -379,6 +379,7 @@ async def update_api_keys(keys: UserApiKeysUpdate, user: dict = Depends(get_curr
         openai_key=keys.openai_key,
         gemini_key=keys.gemini_key,
         resend_key=keys.resend_key,
+        sendgrid_key=keys.sendgrid_key,
         pexels_key=keys.pexels_key
     )
 
