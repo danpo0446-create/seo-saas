@@ -3460,10 +3460,13 @@ async def get_google_oauth_credentials():
     return None, None
 
 
-def create_gsc_oauth_flow_with_credentials(client_id, client_secret):
+def create_gsc_oauth_flow_with_credentials(client_id, client_secret, redirect_uri=None):
     """Create OAuth flow for Google Search Console with provided credentials"""
     if not client_id or not client_secret:
         return None
+    
+    # Use provided redirect_uri or fallback to env or default
+    actual_redirect_uri = redirect_uri or GOOGLE_REDIRECT_URI or "https://saas.seamanshelp.com/api/search-console/callback"
     
     client_config = {
         "web": {
@@ -3471,7 +3474,7 @@ def create_gsc_oauth_flow_with_credentials(client_id, client_secret):
             "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [GOOGLE_REDIRECT_URI]
+            "redirect_uris": [actual_redirect_uri]
         }
     }
     
@@ -3479,7 +3482,7 @@ def create_gsc_oauth_flow_with_credentials(client_id, client_secret):
         client_config,
         scopes=["https://www.googleapis.com/auth/webmasters.readonly"]
     )
-    flow.redirect_uri = GOOGLE_REDIRECT_URI
+    flow.redirect_uri = actual_redirect_uri
     return flow
 
 
