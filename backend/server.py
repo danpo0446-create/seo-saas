@@ -3522,10 +3522,14 @@ async def get_gsc_auth_url(user: dict = Depends(get_current_user)):
         prompt="consent"
     )
     
-    # Store state for verification
+    # Store state and code_verifier for verification in callback
     await db.gsc_states.update_one(
         {"user_id": user["id"]},
-        {"$set": {"state": state, "created_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {
+            "state": state, 
+            "code_verifier": flow.code_verifier,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
         upsert=True
     )
     
@@ -3540,11 +3544,16 @@ async def gsc_oauth_callback(code: str = Query(...), state: str = Query(...)):
         raise HTTPException(status_code=400, detail="Invalid state")
     
     user_id = state_doc["user_id"]
+    code_verifier = state_doc.get("code_verifier")
     
     client_id, client_secret = await get_google_oauth_credentials()
     flow = create_gsc_oauth_flow_with_credentials(client_id, client_secret)
     if not flow:
         raise HTTPException(status_code=400, detail="Google OAuth nu este configurat")
+    
+    # Set the code_verifier from the saved state
+    if code_verifier:
+        flow.code_verifier = code_verifier
     
     try:
         flow.fetch_token(code=code)
