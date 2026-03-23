@@ -78,14 +78,19 @@ const AdminDashboard = () => {
   const [platformSettings, setPlatformSettings] = useState({
     has_stripe_secret_key: false,
     has_stripe_publishable_key: false,
-    has_resend_key: false
+    has_resend_key: false,
+    has_google_client_id: false,
+    has_google_client_secret: false
   });
   const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [resendKey, setResendKey] = useState("");
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleClientSecret, setGoogleClientSecret] = useState("");
   const [showStripeSecretKey, setShowStripeSecretKey] = useState(false);
   const [showStripePublishableKey, setShowStripePublishableKey] = useState(false);
   const [showResendKey, setShowResendKey] = useState(false);
+  const [showGoogleClientSecret, setShowGoogleClientSecret] = useState(false);
   const [savingPlatform, setSavingPlatform] = useState(false);
 
   // Password change
@@ -266,6 +271,8 @@ const AdminDashboard = () => {
       if (stripeSecretKey.trim()) data.stripe_secret_key = stripeSecretKey.trim();
       if (stripePublishableKey.trim()) data.stripe_publishable_key = stripePublishableKey.trim();
       if (resendKey.trim()) data.resend_key = resendKey.trim();
+      if (googleClientId.trim()) data.google_client_id = googleClientId.trim();
+      if (googleClientSecret.trim()) data.google_client_secret = googleClientSecret.trim();
       
       if (Object.keys(data).length === 0) {
         toast.error("Introdu cel putin o cheie");
@@ -277,6 +284,8 @@ const AdminDashboard = () => {
       setStripeSecretKey("");
       setStripePublishableKey("");
       setResendKey("");
+      setGoogleClientId("");
+      setGoogleClientSecret("");
       fetchPlatformSettings();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Eroare la salvare");
@@ -1182,6 +1191,25 @@ const AdminDashboard = () => {
                       </Badge>
                     )}
                   </div>
+                  
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-[#171717]">
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-5 h-5 text-red-500" />
+                      <div>
+                        <p className="text-white font-medium">Google OAuth</p>
+                        <p className="text-[#71717A] text-sm">Pentru Google Search Console</p>
+                      </div>
+                    </div>
+                    {platformSettings.has_google_client_id && platformSettings.has_google_client_secret ? (
+                      <Badge className="bg-[#00E676]/10 text-[#00E676]">
+                        <CheckCircle className="w-3 h-3 mr-1" /> Configurat
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-yellow-500/10 text-yellow-500">
+                        Opțional
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="p-3 rounded-lg bg-[#00E676]/5 border border-[#00E676]/20">
@@ -1277,9 +1305,53 @@ const AdminDashboard = () => {
                   </p>
                 </div>
                 
+                <div className="pt-4 border-t border-[#262626]">
+                  <p className="text-[#A1A1AA] text-sm mb-4">Google OAuth (pentru Search Console)</p>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[#A1A1AA] flex items-center gap-2">
+                        <Globe className="w-4 h-4" /> Google Client ID
+                      </Label>
+                      <Input
+                        type="text"
+                        placeholder="xxxxx.apps.googleusercontent.com"
+                        value={googleClientId}
+                        onChange={(e) => setGoogleClientId(e.target.value)}
+                        className="bg-[#171717] border-[#262626] text-white"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[#A1A1AA] flex items-center gap-2">
+                        <Globe className="w-4 h-4" /> Google Client Secret
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type={showGoogleClientSecret ? "text" : "password"}
+                          placeholder="GOCSPX-..."
+                          value={googleClientSecret}
+                          onChange={(e) => setGoogleClientSecret(e.target.value)}
+                          className="bg-[#171717] border-[#262626] text-white pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowGoogleClientSecret(!showGoogleClientSecret)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                        >
+                          {showGoogleClientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[#71717A] text-xs">
+                        Obține de la: <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-[#00E676] hover:underline">Google Cloud Console</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <Button
                   onClick={savePlatformSettings}
-                  disabled={savingPlatform || (!stripeSecretKey && !stripePublishableKey && !resendKey)}
+                  disabled={savingPlatform || (!stripeSecretKey && !stripePublishableKey && !resendKey && !googleClientId && !googleClientSecret)}
                   className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
                 >
                   <Save className="w-4 h-4 mr-2" />

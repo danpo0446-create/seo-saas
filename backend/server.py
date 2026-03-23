@@ -3435,6 +3435,54 @@ async def disconnect_wordpress(user: dict = Depends(get_current_user)):
 
 # ============ GOOGLE SEARCH CONSOLE OAUTH ============
 
+async def get_google_oauth_credentials():
+    """Get Google OAuth credentials from platform settings or env"""
+    # First try from database (admin configured)
+    settings = await db.platform_settings.find_one({"id": "main"}, {"_id": 0})
+    
+    if settings:
+        import base64
+        client_id = settings.get("google_client_id")
+        client_secret = settings.get("google_client_secret")
+        
+        if client_id and client_secret:
+            try:
+                client_id = base64.b64decode(client_id.encode()).decode()
+                client_secret = base64.b64decode(client_secret.encode()).decode()
+                return client_id, client_secret
+            except:
+                pass
+    
+    # Fallback to env variables
+    if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+        return GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+    
+    return None, None
+
+
+def create_gsc_oauth_flow_with_credentials(client_id, client_secret):
+    """Create OAuth flow for Google Search Console with provided credentials"""
+    if not client_id or not client_secret:
+        return None
+    
+    client_config = {
+        "web": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [GOOGLE_REDIRECT_URI]
+        }
+    }
+    
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=["https://www.googleapis.com/auth/webmasters.readonly"]
+    )
+    flow.redirect_uri = GOOGLE_REDIRECT_URI
+    return flow
+
+
 def create_gsc_oauth_flow():
     """Create OAuth flow for Google Search Console"""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
@@ -3460,9 +3508,10 @@ def create_gsc_oauth_flow():
 @api_router.get("/search-console/auth-url")
 async def get_gsc_auth_url(user: dict = Depends(get_current_user)):
     """Get Google Search Console OAuth authorization URL"""
-    flow = create_gsc_oauth_flow()
+    client_id, client_secret = await get_google_oauth_credentials()
+    flow = create_gsc_oauth_flow_with_credentials(client_id, client_secret)
     if not flow:
-        raise HTTPException(status_code=400, detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env")
+        raise HTTPException(status_code=400, detail="Google OAuth nu este configurat. Contactează administratorul platformei.")
     
     authorization_url, state = flow.authorization_url(
         access_type="offline",
@@ -3489,9 +3538,10 @@ async def gsc_oauth_callback(code: str = Query(...), state: str = Query(...)):
     
     user_id = state_doc["user_id"]
     
-    flow = create_gsc_oauth_flow()
+    client_id, client_secret = await get_google_oauth_credentials()
+    flow = create_gsc_oauth_flow_with_credentials(client_id, client_secret)
     if not flow:
-        raise HTTPException(status_code=400, detail="Google OAuth not configured")
+        raise HTTPException(status_code=400, detail="Google OAuth nu este configurat")
     
     try:
         flow.fetch_token(code=code)

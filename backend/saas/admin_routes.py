@@ -395,6 +395,8 @@ class PlatformSettingsUpdate(BaseModel):
     stripe_secret_key: Optional[str] = None
     stripe_publishable_key: Optional[str] = None
     resend_key: Optional[str] = None
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
 
 
 def encrypt_platform_key(key: str) -> str:
@@ -422,7 +424,9 @@ async def get_platform_settings(admin: dict = Depends(get_admin_user)):
     return {
         "has_stripe_secret_key": bool(settings.get("stripe_secret_key") or settings.get("stripe_key")) if settings else False,
         "has_stripe_publishable_key": bool(settings.get("stripe_publishable_key")) if settings else False,
-        "has_resend_key": bool(settings.get("resend_key")) if settings else False
+        "has_resend_key": bool(settings.get("resend_key")) if settings else False,
+        "has_google_client_id": bool(settings.get("google_client_id")) if settings else False,
+        "has_google_client_secret": bool(settings.get("google_client_secret")) if settings else False
     }
 
 
@@ -447,6 +451,12 @@ async def update_platform_settings(data: PlatformSettingsUpdate, admin: dict = D
         if not data.resend_key.startswith("re_"):
             raise HTTPException(status_code=400, detail="Cheia Resend trebuie să înceapă cu 're_'")
         update_data["resend_key"] = encrypt_platform_key(data.resend_key)
+    
+    if data.google_client_id:
+        update_data["google_client_id"] = encrypt_platform_key(data.google_client_id)
+    
+    if data.google_client_secret:
+        update_data["google_client_secret"] = encrypt_platform_key(data.google_client_secret)
     
     await db.platform_settings.update_one(
         {"id": "main"},
