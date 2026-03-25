@@ -231,6 +231,7 @@ async def update_user_role(user_id: str, data: UpdateUserRole, admin: dict = Dep
 class UpdateSubscription(BaseModel):
     plan: Optional[str] = None
     status: Optional[str] = None
+    no_expiry: Optional[bool] = None  # Set to True to make subscription permanent
 
 @admin_router.patch("/users/{user_id}/subscription")
 async def update_user_subscription(user_id: str, data: UpdateSubscription, admin: dict = Depends(get_admin_user)):
@@ -251,6 +252,11 @@ async def update_user_subscription(user_id: str, data: UpdateSubscription, admin
         if data.status not in ["active", "trialing", "canceled", "expired"]:
             raise HTTPException(status_code=400, detail="Invalid status")
         update_data["status"] = data.status
+    
+    # Make subscription permanent (no expiry)
+    if data.no_expiry:
+        update_data["trial_ends_at"] = None
+        update_data["current_period_end"] = None
     
     result = await db.subscriptions.update_one(
         {"user_id": user_id},
