@@ -10,7 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Dict, Any
 
 # Constants
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'seo-automation-secret-key-2024')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
