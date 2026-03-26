@@ -544,6 +544,19 @@ async def reset_user_password(user_id: str, data: ResetUserPasswordRequest, admi
 
 # ============ NOTIFICATIONS ============
 
+@admin_router.get("/test-payments")
+async def get_test_payments(admin: dict = Depends(get_admin_user)):
+    """Get all test payments"""
+    db = get_db()
+    
+    payments = await db.test_payments.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    return {"payments": payments, "count": len(payments)}
+
+
 @admin_router.get("/notifications")
 async def get_admin_notifications(
     limit: int = 50,
