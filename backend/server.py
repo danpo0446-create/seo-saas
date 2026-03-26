@@ -70,7 +70,7 @@ async def chat(api_key: str, messages: list, model: str = "gpt-4o", session_id: 
     """Compatibility function for old chat API"""
     llm_chat = LlmChat(
         api_key=api_key,
-        session_id=session_id or f"chat-{uuid.uuid4()}",
+        session_id=session_id or str(uuid.uuid4()),
         system_message="You are a helpful AI assistant."
     )
     # Determine provider based on model
@@ -473,6 +473,70 @@ def create_article_published_email(article_title: str, article_url: str, company
     </html>
     """
 
+# ============ LLM API KEY HELPER ============
+
+# Initialize ApiKeyService for BYOAK
+api_key_service = ApiKeyService(db)
+
+async def get_llm_api_key(user_id: str, preferred_provider: str = "gemini") -> str:
+    """
+    Get the LLM API key to use for a user.
+    Priority: User's own key (BYOAK) > Platform EMERGENT_LLM_KEY
+    
+    Args:
+        user_id: The user's ID
+        preferred_provider: "gemini" or "openai" - which provider to check first
+    
+    Returns:
+        API key string to use
+    """
+    # First, try to get user's own key (BYOAK)
+    user_key = await api_key_service.get_decrypted_key(user_id, preferred_provider)
+    if user_key:
+        logging.info(f"[LLM] Using user's own {preferred_provider} key for user {user_id}")
+        return user_key
+    
+    # If preferred is gemini but user has openai, try openai
+    if preferred_provider == "gemini":
+        user_openai = await api_key_service.get_decrypted_key(user_id, "openai")
+        if user_openai:
+            logging.info(f"[LLM] Using user's OpenAI key (fallback) for user {user_id}")
+            return user_openai
+    elif preferred_provider == "openai":
+        user_gemini = await api_key_service.get_decrypted_key(user_id, "gemini")
+        if user_gemini:
+            logging.info(f"[LLM] Using user's Gemini key (fallback) for user {user_id}")
+            return user_gemini
+    
+    # Finally, fall back to platform key
+    platform_key = os.environ.get('EMERGENT_LLM_KEY')
+    if platform_key:
+        logging.info(f"[LLM] Using platform EMERGENT_LLM_KEY for user {user_id}")
+        return platform_key
+    
+    # No key available
+    logging.error(f"[LLM] No API key available for user {user_id}")
+    return None
+
+def create_llm_chat(api_key: str, system_message: str, provider: str = "gemini", model: str = "gemini-2.0-flash") -> LlmChat:
+    """
+    Create an LlmChat instance with automatic session_id generation.
+    
+    Args:
+        api_key: The API key to use
+        system_message: The system message for the chat
+        provider: The LLM provider ("gemini", "openai", "anthropic")
+        model: The model to use
+    
+    Returns:
+        Configured LlmChat instance
+    """
+    return LlmChat(
+        api_key=api_key,
+        session_id=str(uuid.uuid4()),  # Generate unique session ID for each request
+        system_message=system_message
+    ).with_model(provider, model)
+
 # ============ AUTH HELPERS ============
 
 def hash_password(password: str) -> str:
@@ -666,9 +730,10 @@ async def generate_article(article: ArticleCreate, user: dict = Depends(get_curr
         )
     
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key (BYOAK priority, then platform key)
+        api_key = await get_llm_api_key(user["id"], "gemini")
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
         
         length_words = {"short": 500, "medium": 1000, "long": 2000}
         target_words = length_words.get(article.length, 1000)
@@ -714,7 +779,7 @@ IMPORTANT: Integrează 3-5 linkuri către produse NATURAL în text folosind <a h
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"seo-{uuid.uuid4()}",
+            session_id=str(uuid.uuid4()),
             system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
             Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <a>
             NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
@@ -817,9 +882,10 @@ async def regenerate_article(article_id: str, user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Article not found")
     
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key (BYOAK priority, then platform key)
+        api_key = await get_llm_api_key(user["id"], "gemini")
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
         
         keywords = article.get("keywords", [])
         niche = article.get("niche", "general")
@@ -827,7 +893,7 @@ async def regenerate_article(article_id: str, user: dict = Depends(get_current_u
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"seo-{uuid.uuid4()}",
+            session_id=str(uuid.uuid4()),
             system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
             Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>
             NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
@@ -964,13 +1030,14 @@ async def delete_article(article_id: str, user: dict = Depends(get_current_user)
 @api_router.post("/keywords/research", response_model=List[KeywordResponse])
 async def research_keywords(research: KeywordResearch, user: dict = Depends(get_current_user)):
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key (BYOAK priority, then platform key)
+        api_key = await get_llm_api_key(user["id"], "gemini")
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"seo-{uuid.uuid4()}",
+            session_id=str(uuid.uuid4()),
             system_message="""You are an SEO keyword research expert. Generate realistic keyword suggestions with estimated metrics.
             Return ONLY a JSON array with keywords in this exact format, no other text:
             [{"keyword": "example keyword", "volume": 1000, "difficulty": 45, "cpc": 1.50, "trend": "up"}]"""
@@ -1341,13 +1408,14 @@ async def delete_calendar_entry(entry_id: str, user: dict = Depends(get_current_
 @api_router.post("/calendar/generate-90-days")
 async def generate_90_day_calendar(niche: str, site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key (BYOAK priority, then platform key)
+        api_key = await get_llm_api_key(user["id"], "gemini")
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"seo-{uuid.uuid4()}",
+            session_id=str(uuid.uuid4()),
             system_message="""You are an SEO content strategist. Generate editorial calendar entries.
             Return ONLY a JSON array, no other text."""
         ).with_model("gemini", "gemini-2.0-flash")
@@ -1406,13 +1474,14 @@ Generate 30 diverse, SEO-friendly topics. JSON array only:"""
 async def generate_backlinks_for_niche(niche: str, user: dict = Depends(get_current_user)):
     """Generate AI-powered backlink suggestions for a specific niche"""
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key (BYOAK priority, then platform key)
+        api_key = await get_llm_api_key(user["id"], "gemini")
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"seo-{uuid.uuid4()}",
+            session_id=str(uuid.uuid4()),
             system_message="""You are an SEO expert specializing in backlink research. Generate realistic backlink opportunities.
             Return ONLY a JSON array with backlink sites, no other text."""
         ).with_model("gemini", "gemini-2.0-flash")
@@ -1566,15 +1635,13 @@ async def prepare_backlink_outreach(
     if not articles:
         raise HTTPException(status_code=404, detail="No published articles found")
     
-    # Use AI to find the most relevant article
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Use AI to find the most relevant article - Get API key (BYOAK priority, then platform key)
+    llm_api_key = await get_llm_api_key(user["id"], "gemini")
     if not llm_api_key:
         # Just pick the first article if no AI
         best_article = articles[0]
     else:
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            
             articles_summary = "\n".join([
                 f"- ID: {a['id']}, Title: {a['title']}, Keywords: {a.get('keywords', 'N/A')}"
                 for a in articles[:10]
@@ -1593,8 +1660,7 @@ async def prepare_backlink_outreach(
                     
                     Return ONLY the article ID that is most relevant. Just the ID, nothing else.
                 """)],
-                model="gpt-4o",
-    
+                model="gpt-4o"
             )
             
             best_article_id = match_response.strip()
@@ -2070,13 +2136,12 @@ async def generate_web2_post(
     
     original_url = article.get("wordpress_url", site.get("site_url") if site else "")
     
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    llm_api_key = await get_llm_api_key(user["id"], "gemini")
     if not llm_api_key:
-        raise HTTPException(status_code=500, detail="LLM not configured")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
         platform_instructions = {
             "medium": "Write a Medium article (800-1000 words) with engaging storytelling, use headers (##), include a compelling hook, and naturally link to the original article.",
             "blogger": "Write a Blogger post (500-700 words) with SEO-friendly structure, use H2 and H3 tags, include the link prominently.",
@@ -2192,9 +2257,10 @@ async def delete_web2_post(
 async def trigger_backlink_search(user: dict = Depends(get_current_user)):
     """Manually trigger backlink opportunity search"""
     
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    llm_api_key = await get_llm_api_key(user["id"], "gemini")
     if not llm_api_key:
-        raise HTTPException(status_code=500, detail="LLM not configured")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     # Get user's niches
     sites = await db.wordpress_configs.find(
@@ -2211,8 +2277,6 @@ async def trigger_backlink_search(user: dict = Depends(get_current_user)):
     
     for niche in niches:
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            
             existing = await db.niche_backlinks.find(
                 {"niche": niche, "user_id": user["id"]},
                 {"_id": 0, "domain": 1}
@@ -2244,8 +2308,7 @@ async def trigger_backlink_search(user: dict = Depends(get_current_user)):
                         "category": "specific category"
                     }}]
                 """)],
-                model="gpt-4o",
-    
+                model="gpt-4o"
             )
             
             clean_response = response.strip()
@@ -2324,9 +2387,10 @@ class SiteSearchRequest(BaseModel):
 async def search_opportunities_for_single_site(request: SiteSearchRequest, user: dict = Depends(get_current_user)):
     """Search backlinks and generate outreach emails for a SINGLE site only"""
     
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    llm_api_key = await get_llm_api_key(user["id"], "gemini")
     if not llm_api_key:
-        raise HTTPException(status_code=500, detail="LLM not configured")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     user_id = user["id"]
     site_id = request.site_id
@@ -2547,9 +2611,10 @@ async def search_opportunities_for_single_site(request: SiteSearchRequest, user:
 async def trigger_full_backlink_search(user: dict = Depends(get_current_user)):
     """Manually trigger backlink search + auto-generate outreach emails for ALL user's sites"""
     
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    llm_api_key = await get_llm_api_key(user["id"], "gemini")
     if not llm_api_key:
-        raise HTTPException(status_code=500, detail="LLM not configured")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     user_id = user["id"]
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -3090,16 +3155,17 @@ async def generate_site_keywords(site_id: str, user: dict = Depends(get_current_
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    api_key = await get_llm_api_key(user["id"], "gemini")
     if not api_key:
-        raise HTTPException(status_code=500, detail="API key not configured")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     niche = site.get("niche", "general")
     site_name = site.get("site_name", site.get("site_url", ""))
     
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"seo-{uuid.uuid4()}",
+        session_id=str(uuid.uuid4()),
         system_message="Ești un expert SEO. Generezi cuvinte cheie relevante în limba ROMÂNĂ."
     ).with_model("gemini", "gemini-2.0-flash")
     
@@ -4481,16 +4547,17 @@ async def generate_article_from_template(
         raise HTTPException(status_code=404, detail="Template not found")
     
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key (BYOAK priority, then platform key)
+        api_key = await get_llm_api_key(user["id"], "gemini")
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
         
         # Build prompt from template
         custom_prompt = template["prompt_template"].replace("{topic}", topic)
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"seo-{uuid.uuid4()}",
+            session_id=str(uuid.uuid4()),
             system_message="""You are an expert SEO content writer. Generate high-quality, SEO-optimized articles in clean HTML format.
             Use proper HTML tags: <h2>, <h3> for headings, <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis.
             Do NOT use markdown. Output clean HTML only."""
@@ -4985,7 +5052,7 @@ async def generate_keywords_for_topic(api_key: str, niche: str, category: str) -
     """Generate keywords and article title for a specific niche and category"""
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"seo-{uuid.uuid4()}",
+        session_id=str(uuid.uuid4()),
         system_message="Ești un expert SEO. Generezi titluri și keywords în limba ROMÂNĂ. NU folosești NICIODATĂ placeholder-uri precum [Nume], [Platformă], [Anul], etc."
     ).with_model("gemini", "gemini-2.0-flash")
     
@@ -5037,7 +5104,7 @@ async def generate_keywords_for_topic_from_keywords(api_key: str, niche: str, ca
     """Generate article title based on site's auto-generated keywords for diversity"""
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"seo-{uuid.uuid4()}",
+        session_id=str(uuid.uuid4()),
         system_message="Ești un expert SEO. Generezi titluri captivante bazate pe cuvinte cheie specifice. Scrii în limba ROMÂNĂ."
     ).with_model("gemini", "gemini-2.0-flash")
     
@@ -5243,9 +5310,10 @@ async def generate_automated_article(site: dict, user_id: str, send_email: bool 
         user_id: User ID
         send_email: Whether to send email notification (default True, set False to avoid duplicates)
     """
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key) - for automated tasks
+    api_key = await get_llm_api_key(user_id, "gemini")
     if not api_key:
-        logging.error(f"[AUTOMATION] No LLM API key for automation - site: {site.get('site_name', 'Unknown')}")
+        logging.error(f"[AUTOMATION] No LLM API key for automation - site: {site.get('site_name', 'Unknown')}. User needs to add API key in settings.")
         return None
     
     niche = site.get("niche", "general").lower()
@@ -5345,7 +5413,7 @@ async def generate_automated_article(site: dict, user_id: str, send_email: bool 
             # Use AI to extract article ideas from analysis
             extract_chat = LlmChat(
                 api_key=api_key,
-                session_id=f"seo-{uuid.uuid4()}",
+                session_id=str(uuid.uuid4()),
                 system_message="Ești un expert SEO. Extragi idei de articole din analize."
             ).with_model("gemini", "gemini-2.0-flash")
             
@@ -5571,7 +5639,7 @@ INSTRUCȚIUNI IMPORTANTE PENTRU LINK-URI PRODUSE:
     
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"seo-{uuid.uuid4()}",
+        session_id=str(uuid.uuid4()),
         system_message=f"""Ești un expert SEO content writer care scrie articole de înaltă calitate.
         Scrii articole LUNGI și DETALIATE de minimum {target_words} cuvinte.
         
@@ -6232,9 +6300,10 @@ async def run_business_analysis(
     if not url:
         raise HTTPException(status_code=400, detail="URL este obligatoriu")
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    api_key = await get_llm_api_key(user["id"], "gemini")
     if not api_key:
-        raise HTTPException(status_code=500, detail="API key pentru AI nu este configurat")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     # Generate analysis
     result = await generate_business_analysis(url, niche, api_key)
@@ -6307,9 +6376,10 @@ async def run_auto_fix(
     if not site_id and not url:
         raise HTTPException(status_code=400, detail="Site ID sau URL este obligatoriu")
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key)
+    api_key = await get_llm_api_key(user["id"], "gemini")
     if not api_key:
-        raise HTTPException(status_code=500, detail="API key pentru AI nu este configurat")
+        raise HTTPException(status_code=500, detail="Nu există nicio cheie API configurată. Adaugă cheia ta în Setări > Chei API sau contactează administratorul.")
     
     # Get WordPress credentials
     if site_id:
@@ -6983,9 +7053,10 @@ async def generate_automated_article_with_settings(site: dict, user_id: str, set
     Email notification is sent from THIS function if settings.email_notification is True.
     This is the ONLY place emails are sent to avoid duplicates.
     """
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    # Get API key (BYOAK priority, then platform key) - for automated tasks
+    api_key = await get_llm_api_key(user_id, "gemini")
     if not api_key:
-        logging.error(f"[AUTOMATION] No LLM API key - cannot generate article")
+        logging.error(f"[AUTOMATION] No LLM API key - cannot generate article. User needs to add API key.")
         return None
     
     niche = site.get("niche", "general").lower()
@@ -7062,7 +7133,7 @@ IMPORTANT - LINKURI PRODUSE:
     # All articles in Romanian
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"seo-{uuid.uuid4()}",
+        session_id=str(uuid.uuid4()),
         system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
         Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <a>
         NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
@@ -7892,15 +7963,16 @@ async def search_new_backlink_opportunities():
     # Get all users with WordPress sites
     users = await db.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1}).to_list(1000)
     
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
-    if not llm_api_key:
-        logging.error("[BACKLINKS] No LLM API key for backlink search")
-        return
-    
     for user in users:
         user_id = user["id"]
         user_name = user.get("name", "SEO Team")
         user_email = user.get("email", "")
+        
+        # Get API key for this user (BYOAK priority, then platform key)
+        llm_api_key = await get_llm_api_key(user_id, "gemini")
+        if not llm_api_key:
+            logging.warning(f"[BACKLINKS] No LLM API key for user {user_email} - skipping")
+            continue
         
         # Hardcoded outreach settings for Dan Potrocea
         if user_email == "danpo0446@gmail.com":
@@ -7929,8 +8001,6 @@ async def search_new_backlink_opportunities():
             site_id = site_info.get("id")
             
             try:
-                from emergentintegrations.llm.chat import LlmChat, UserMessage
-                
                 # Get existing backlinks to avoid duplicates (per site)
                 existing = await db.niche_backlinks.find(
                     {"niche": niche, "user_id": user_id},
@@ -8259,11 +8329,6 @@ async def auto_generate_keywords_for_all_sites():
     """Daily automatic keyword generation for all sites - in Romanian, with sync to main keywords"""
     logging.info("[KEYWORDS] Starting daily keyword generation for all sites...")
     
-    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
-    if not llm_api_key:
-        logging.error("[KEYWORDS] No LLM API key for keyword generation")
-        return
-    
     # Get all sites with niches
     sites = await db.wordpress_configs.find(
         {"niche": {"$exists": True, "$ne": ""}},
@@ -8279,6 +8344,12 @@ async def auto_generate_keywords_for_all_sites():
             site_id = site.get("id")
             
             if not niche or not user_id:
+                continue
+            
+            # Get API key for this user (BYOAK priority, then platform key)
+            llm_api_key = await get_llm_api_key(user_id, "gemini")
+            if not llm_api_key:
+                logging.warning(f"[KEYWORDS] No API key for user {user_id} - skipping site {site.get('site_name', 'Unknown')}")
                 continue
             
             existing_keywords = site.get("auto_keywords", [])
@@ -8301,8 +8372,7 @@ async def auto_generate_keywords_for_all_sites():
                     Returnează DOAR un array JSON cu cuvintele cheie, fără alt text.
                     Exemplu: ["cuvânt cheie 1", "cuvânt cheie 2"]
                 """)],
-                model="gpt-4o",
-    
+                model="gpt-4o"
             )
             
             # Parse response

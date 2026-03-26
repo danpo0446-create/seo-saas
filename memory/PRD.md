@@ -7,6 +7,22 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 - **Trial**: 7 zile gratuit
 - **BYOAK**: Clienții își pun propriile API keys
 
+## Latest Updates (26 Martie 2026)
+
+### ✅ AI Functionality Fix Completed
+- **Problem**: AI functions (Keyword Research, Article Generation) were broken due to missing `session_id` parameter in `LlmChat` calls
+- **Solution**: 
+  1. Added `session_id=str(uuid.uuid4())` to all 14 `LlmChat` instances in `/app/backend/server.py`
+  2. Implemented BYOAK (Bring Your Own API Key) priority system:
+     - First checks user's own API keys (openai_key, gemini_key)
+     - Falls back to platform's `EMERGENT_LLM_KEY` if user has no keys
+  3. Created helper functions: `get_llm_api_key()` and `create_llm_chat()`
+
+### Testing Status
+- ✅ Keyword Research: Working (tested with curl)
+- ✅ Article Generation: Working (tested with curl - generated 2218 word article)
+- ✅ BYOAK logic: Working (logs show fallback to platform key when user has no keys)
+
 ## Architecture
 
 ### Backend (FastAPI)
