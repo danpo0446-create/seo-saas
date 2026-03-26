@@ -33,14 +33,26 @@ const BillingPage = () => {
   });
   const [savingKeys, setSavingKeys] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
+  const [userPayments, setUserPayments] = useState([]);
+  const [canSeeTestPayments, setCanSeeTestPayments] = useState(false);
 
   useEffect(() => {
     fetchData();
+    fetchUserPayments();
     
     // Check for Stripe redirect
     const sessionId = searchParams.get("session_id");
     if (sessionId) {
       checkPaymentStatus(sessionId);
+    }
+    
+    // Check for test payment result
+    const testPayment = searchParams.get("test_payment");
+    if (testPayment === "success") {
+      toast.success("Plata de test a fost procesată cu succes!");
+      fetchUserPayments();
+    } else if (testPayment === "cancelled") {
+      toast.info("Plata de test a fost anulată");
     }
   }, [searchParams]);
 
@@ -65,6 +77,19 @@ const BillingPage = () => {
       toast.error("Eroare la încărcarea datelor");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserPayments = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const res = await axios.get(`${API}/saas/payments`, { headers });
+      setUserPayments(res.data.payments || []);
+      setCanSeeTestPayments(res.data.can_see_test_payments || false);
+    } catch (error) {
+      console.log("Could not fetch payments");
     }
   };
 
@@ -511,6 +536,68 @@ const BillingPage = () => {
                           </Button>
                         )}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Payments History */}
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-purple-500" />
+                Istoric Plăți
+              </CardTitle>
+              <CardDescription className="text-[#71717A]">
+                Toate tranzacțiile tale procesate prin Stripe
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userPayments.length === 0 ? (
+                <div className="text-center py-8 text-[#71717A]">
+                  <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                  <p>Nu ai nicio plată încă.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userPayments.map((payment, index) => (
+                    <div 
+                      key={payment.id || index}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        payment.is_test 
+                          ? 'bg-purple-500/5 border-purple-500/20' 
+                          : 'bg-[#171717] border-[#262626]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          payment.is_test ? 'bg-purple-500/10' : 'bg-green-500/10'
+                        }`}>
+                          <CreditCard className={`w-4 h-4 ${
+                            payment.is_test ? 'text-purple-500' : 'text-green-500'
+                          }`} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-white font-medium">€{payment.amount || '0.00'}</p>
+                            {payment.is_test && (
+                              <Badge className="bg-purple-500/20 text-purple-400 text-xs">TEST</Badge>
+                            )}
+                          </div>
+                          <p className="text-[#71717A] text-xs">
+                            {payment.created_at ? new Date(payment.created_at).toLocaleString('ro-RO') : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className={`text-xs ${
+                        payment.status === 'paid' || payment.status === 'succeeded' || payment.status === 'initiated'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {payment.status === 'initiated' ? 'Procesată' : payment.status}
+                      </Badge>
                     </div>
                   ))}
                 </div>

@@ -542,6 +542,49 @@ async def reset_user_password(user_id: str, data: ResetUserPasswordRequest, admi
     return {"message": f"Parola pentru {user.get('email')} a fost resetată cu succes"}
 
 
+# ============ PAYMENTS HISTORY ============
+
+@admin_router.get("/payments")
+async def get_all_payments(
+    admin: dict = Depends(get_admin_user),
+    limit: int = 100,
+    include_test: bool = True
+):
+    """Get all payments (admin only)"""
+    db = get_db()
+    
+    query = {}
+    if not include_test:
+        query["metadata.type"] = {"$ne": "test_payment"}
+    
+    # Get from payment_transactions
+    payments = await db.payment_transactions.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Also get test payments
+    test_payments = await db.test_payments.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Mark test payments
+    for tp in test_payments:
+        tp["is_test"] = True
+        tp["type"] = "test_payment"
+    
+    # Combine and sort
+    all_payments = payments + test_payments
+    all_payments.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    return {
+        "payments": all_payments[:limit],
+        "total_count": len(all_payments),
+        "test_count": len(test_payments)
+    }
+
+
 # ============ NOTIFICATIONS ============
 
 @admin_router.get("/test-payments")

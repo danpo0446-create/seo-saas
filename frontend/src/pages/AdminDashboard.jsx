@@ -106,11 +106,17 @@ const AdminDashboard = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
+  // Payments
+  const [payments, setPayments] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [paymentsStats, setPaymentsStats] = useState({ total: 0, test: 0 });
+
   useEffect(() => {
     fetchData();
     fetchContent();
     fetchPlatformSettings();
     fetchNotifications();
+    fetchPayments();
   }, []);
 
   const fetchData = async () => {
@@ -258,6 +264,25 @@ const AdminDashboard = () => {
       fetchNotifications();
     } catch (error) {
       toast.error("Eroare la marcarea notificărilor");
+    }
+  };
+
+  const fetchPayments = async () => {
+    setLoadingPayments(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const res = await axios.get(`${API}/admin/payments`, { headers });
+      setPayments(res.data.payments || []);
+      setPaymentsStats({
+        total: res.data.total_count || 0,
+        test: res.data.test_count || 0
+      });
+    } catch (error) {
+      console.log("Could not fetch payments");
+    } finally {
+      setLoadingPayments(false);
     }
   };
 
@@ -506,6 +531,9 @@ const AdminDashboard = () => {
           </TabsTrigger>
           <TabsTrigger value="content" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
             Continut Site
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
+            Plăți
           </TabsTrigger>
           <TabsTrigger value="platform" className="data-[state=active]:bg-[#00E676] data-[state=active]:text-black">
             Setari Platforma
@@ -1117,6 +1145,101 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* PAYMENTS TAB */}
+        <TabsContent value="payments" className="mt-6">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-[#00E676]" />
+                  Istoric Plăți
+                </CardTitle>
+                <CardDescription className="text-[#71717A]">
+                  Toate tranzacțiile din platformă ({paymentsStats.total} total, {paymentsStats.test} test)
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchPayments}
+                className="border-[#262626] text-[#A1A1AA] hover:text-white"
+              >
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loadingPayments ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00E676]"></div>
+                </div>
+              ) : payments.length === 0 ? (
+                <div className="text-center py-12 text-[#71717A]">
+                  <CreditCard className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Nu există plăți încă</p>
+                  <p className="text-sm mt-1">Plățile vor apărea aici după procesare</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {payments.map((payment, index) => (
+                    <div
+                      key={payment.id || index}
+                      className={`p-4 rounded-lg border ${
+                        payment.is_test 
+                          ? 'bg-purple-500/5 border-purple-500/20' 
+                          : 'bg-[#171717] border-[#262626]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            payment.is_test 
+                              ? 'bg-purple-500/10' 
+                              : payment.status === 'paid' || payment.status === 'succeeded'
+                                ? 'bg-green-500/10'
+                                : 'bg-yellow-500/10'
+                          }`}>
+                            <CreditCard className={`w-5 h-5 ${
+                              payment.is_test 
+                                ? 'text-purple-500' 
+                                : payment.status === 'paid' || payment.status === 'succeeded'
+                                  ? 'text-green-500'
+                                  : 'text-yellow-500'
+                            }`} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-white font-medium">
+                                €{payment.amount || '0.00'}
+                              </p>
+                              {payment.is_test && (
+                                <Badge className="bg-purple-500/20 text-purple-400 text-xs">TEST</Badge>
+                              )}
+                              <Badge className={`text-xs ${
+                                payment.status === 'paid' || payment.status === 'succeeded' || payment.status === 'initiated'
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-yellow-500/20 text-yellow-400'
+                              }`}>
+                                {payment.status === 'initiated' ? 'Procesată' : payment.status}
+                              </Badge>
+                            </div>
+                            <p className="text-[#A1A1AA] text-sm">{payment.user_email || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[#71717A] text-sm">
+                            {payment.created_at ? new Date(payment.created_at).toLocaleString('ro-RO') : 'N/A'}
+                          </p>
+                          <p className="text-[#71717A] text-xs">{payment.currency?.toUpperCase() || 'EUR'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* PLATFORM SETTINGS TAB */}

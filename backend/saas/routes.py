@@ -430,6 +430,46 @@ async def get_analytics_overview(user: dict = Depends(get_current_user_saas)):
     }
 
 
+# ============ USER PAYMENTS HISTORY ============
+
+@saas_router.get("/payments")
+async def get_user_payments(user: dict = Depends(get_current_user_saas)):
+    """Get user's payment history"""
+    db = get_db()
+    
+    # Check if user can see test payments (admin or test account)
+    is_admin = user.get("role") == "admin"
+    is_test_account = "test" in user.get("email", "").lower()
+    can_see_test = is_admin or is_test_account
+    
+    # Get regular payments
+    payments = await db.payment_transactions.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    # Get test payments if allowed
+    test_payments = []
+    if can_see_test:
+        test_payments = await db.test_payments.find(
+            {"user_id": user["id"]},
+            {"_id": 0}
+        ).sort("created_at", -1).limit(50).to_list(50)
+        
+        for tp in test_payments:
+            tp["is_test"] = True
+            tp["type"] = "test_payment"
+    
+    # Combine and sort
+    all_payments = payments + test_payments
+    all_payments.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    return {
+        "payments": all_payments,
+        "can_see_test_payments": can_see_test
+    }
+
+
 # ============ BYOAK ROUTES ============
 
 @saas_router.get("/api-keys", response_model=UserApiKeysResponse)
