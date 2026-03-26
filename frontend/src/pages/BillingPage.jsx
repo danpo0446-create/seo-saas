@@ -192,6 +192,34 @@ const BillingPage = () => {
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
+  // Check if user can do test payment (admin or test account)
+  const canDoTestPayment = () => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    return user.role === "admin" || (user.email && user.email.toLowerCase().includes("test"));
+  };
+
+  const [testPaymentLoading, setTestPaymentLoading] = useState(false);
+  
+  const handleTestPayment = async () => {
+    setTestPaymentLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(`${API}/saas/test-payment`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.url) {
+        toast.success("Redirecționare către Stripe...");
+        window.location.href = response.data.url;
+      }
+    } catch (error) {
+      console.error("Test payment error:", error);
+      toast.error(error.response?.data?.detail || "Eroare la inițierea plății de test");
+    } finally {
+      setTestPaymentLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -397,6 +425,23 @@ const BillingPage = () => {
                   <Trash2 className="w-4 h-4 mr-2" />
                   Anulează Subscripția
                 </Button>
+                
+                {/* Test Payment Button - only for admin and test accounts */}
+                {canDoTestPayment() && (
+                  <Button 
+                    variant="outline" 
+                    className="border-purple-500/50 hover:bg-purple-500/10 justify-start text-purple-400 hover:text-purple-400" 
+                    onClick={handleTestPayment}
+                    disabled={testPaymentLoading}
+                  >
+                    {testPaymentLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4 mr-2" />
+                    )}
+                    Test Plată €1
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

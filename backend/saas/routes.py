@@ -233,6 +233,76 @@ async def get_checkout_status(session_id: str, user: dict = Depends(get_current_
         raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
 
 
+# ============ TEST PAYMENT ============
+
+@saas_router.post("/test-payment")
+async def create_test_payment(http_request: Request, user: dict = Depends(get_current_user_saas)):
+    """Create a €1 test payment to verify Stripe integration"""
+    db = get_db()
+    
+    # Only allow for admin or test accounts
+    if user.get("role") != "admin" and "test" not in user.get("email", "").lower():
+        raise HTTPException(status_code=403, detail="Plata de test este disponibilă doar pentru admin și conturi de test")
+    
+    # Get Stripe key from platform settings or env
+    stripe_api_key = None
+    settings = await db.platform_settings.find_one({"id": "main"}, {"_id": 0})
+    if settings and settings.get("stripe_secret_key"):
+        import base64
+        try:
+            stripe_api_key = base64.b64decode(settings["stripe_secret_key"].encode()).decode()
+        except:
+            pass
+    
+    if not stripe_api_key:
+        stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    
+    if not stripe_api_key:
+        raise HTTPException(status_code=500, detail="Stripe nu este configurat")
+    
+    origin = str(http_request.headers.get("origin", "https://saas.seamanshelp.com"))
+    success_url = f"{origin}/app/billing?test_payment=success"
+    cancel_url = f"{origin}/app/billing?test_payment=cancelled"
+    
+    webhook_url = f"{str(http_request.base_url).rstrip('/')}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=1.0,  # €1 test payment
+        currency="eur",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "user_id": user["id"],
+            "user_email": user["email"],
+            "type": "test_payment",
+            "description": "Test plată €1 pentru verificare Stripe"
+        }
+    )
+    
+    try:
+        session = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Log test payment
+        await db.test_payments.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "user_email": user["email"],
+            "session_id": session.session_id,
+            "amount": 1.0,
+            "currency": "eur",
+            "status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        logging.info(f"[STRIPE TEST] Created test payment session {session.session_id} for {user['email']}")
+        
+        return {"url": session.url, "session_id": session.session_id, "amount": "€1.00"}
+    except Exception as e:
+        logging.error(f"[STRIPE TEST] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Eroare la crearea plății de test: {str(e)}")
+
+
 # ============ BILLING PORTAL ============
 
 @saas_router.post("/billing-portal", response_model=BillingPortalResponse)
