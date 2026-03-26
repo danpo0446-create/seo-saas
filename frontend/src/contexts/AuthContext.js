@@ -20,8 +20,10 @@ export const AuthProvider = ({ children }) => {
           });
           setUser(response.data);
           setToken(storedToken);
+          localStorage.setItem('user', JSON.stringify(response.data));
         } catch (error) {
           localStorage.removeItem('token');
+          localStorage.removeItem('user');
           setToken(null);
           setUser(null);
         }
@@ -35,6 +37,7 @@ export const AuthProvider = ({ children }) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { token: newToken, user: userData } = response.data;
     localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
     return userData;
@@ -44,6 +47,7 @@ export const AuthProvider = ({ children }) => {
     const response = await axios.post(`${API}/auth/register`, { name, email, password });
     const { token: newToken, user: userData } = response.data;
     localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
     return userData;
@@ -51,6 +55,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setToken(null);
     setUser(null);
   };

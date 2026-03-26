@@ -193,10 +193,15 @@ const BillingPage = () => {
   };
 
   // Check if user can do test payment (admin or test account)
-  const canDoTestPayment = () => {
+  const [canTestPayment, setCanTestPayment] = useState(false);
+  
+  useEffect(() => {
+    // Check from user data in localStorage or from subscription response
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    return user.role === "admin" || (user.email && user.email.toLowerCase().includes("test"));
-  };
+    const isAdmin = user.role === "admin";
+    const isTestAccount = user.email && user.email.toLowerCase().includes("test");
+    setCanTestPayment(isAdmin || isTestAccount);
+  }, []);
 
   const [testPaymentLoading, setTestPaymentLoading] = useState(false);
   
@@ -427,7 +432,7 @@ const BillingPage = () => {
                 </Button>
                 
                 {/* Test Payment Button - only for admin and test accounts */}
-                {canDoTestPayment() && (
+                {canTestPayment && (
                   <Button 
                     variant="outline" 
                     className="border-purple-500/50 hover:bg-purple-500/10 justify-start text-purple-400 hover:text-purple-400" 
