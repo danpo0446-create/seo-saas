@@ -70,7 +70,7 @@ async def chat(api_key: str, messages: list, model: str = "gpt-4o", session_id: 
     """Compatibility function for old chat API"""
     llm_chat = LlmChat(
         api_key=api_key,
-        
+        session_id=session_id or f"chat-{uuid.uuid4()}",
         system_message="You are a helpful AI assistant."
     )
     # Determine provider based on model
@@ -714,7 +714,7 @@ IMPORTANT: Integrează 3-5 linkuri către produse NATURAL în text folosind <a h
         
         chat = LlmChat(
             api_key=api_key,
-            
+            session_id=f"seo-{uuid.uuid4()}",
             system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
             Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <a>
             NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
@@ -827,7 +827,7 @@ async def regenerate_article(article_id: str, user: dict = Depends(get_current_u
         
         chat = LlmChat(
             api_key=api_key,
-            
+            session_id=f"seo-{uuid.uuid4()}",
             system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
             Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>
             NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
@@ -970,7 +970,7 @@ async def research_keywords(research: KeywordResearch, user: dict = Depends(get_
         
         chat = LlmChat(
             api_key=api_key,
-            
+            session_id=f"seo-{uuid.uuid4()}",
             system_message="""You are an SEO keyword research expert. Generate realistic keyword suggestions with estimated metrics.
             Return ONLY a JSON array with keywords in this exact format, no other text:
             [{"keyword": "example keyword", "volume": 1000, "difficulty": 45, "cpc": 1.50, "trend": "up"}]"""
@@ -1347,7 +1347,7 @@ async def generate_90_day_calendar(niche: str, site_id: Optional[str] = None, us
         
         chat = LlmChat(
             api_key=api_key,
-            
+            session_id=f"seo-{uuid.uuid4()}",
             system_message="""You are an SEO content strategist. Generate editorial calendar entries.
             Return ONLY a JSON array, no other text."""
         ).with_model("gemini", "gemini-2.0-flash")
@@ -1412,7 +1412,7 @@ async def generate_backlinks_for_niche(niche: str, user: dict = Depends(get_curr
         
         chat = LlmChat(
             api_key=api_key,
-            
+            session_id=f"seo-{uuid.uuid4()}",
             system_message="""You are an SEO expert specializing in backlink research. Generate realistic backlink opportunities.
             Return ONLY a JSON array with backlink sites, no other text."""
         ).with_model("gemini", "gemini-2.0-flash")
@@ -3099,7 +3099,7 @@ async def generate_site_keywords(site_id: str, user: dict = Depends(get_current_
     
     chat = LlmChat(
         api_key=api_key,
-        
+        session_id=f"seo-{uuid.uuid4()}",
         system_message="Ești un expert SEO. Generezi cuvinte cheie relevante în limba ROMÂNĂ."
     ).with_model("gemini", "gemini-2.0-flash")
     
@@ -4490,7 +4490,7 @@ async def generate_article_from_template(
         
         chat = LlmChat(
             api_key=api_key,
-            
+            session_id=f"seo-{uuid.uuid4()}",
             system_message="""You are an expert SEO content writer. Generate high-quality, SEO-optimized articles in clean HTML format.
             Use proper HTML tags: <h2>, <h3> for headings, <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis.
             Do NOT use markdown. Output clean HTML only."""
@@ -4985,7 +4985,7 @@ async def generate_keywords_for_topic(api_key: str, niche: str, category: str) -
     """Generate keywords and article title for a specific niche and category"""
     chat = LlmChat(
         api_key=api_key,
-        
+        session_id=f"seo-{uuid.uuid4()}",
         system_message="Ești un expert SEO. Generezi titluri și keywords în limba ROMÂNĂ. NU folosești NICIODATĂ placeholder-uri precum [Nume], [Platformă], [Anul], etc."
     ).with_model("gemini", "gemini-2.0-flash")
     
@@ -5037,7 +5037,7 @@ async def generate_keywords_for_topic_from_keywords(api_key: str, niche: str, ca
     """Generate article title based on site's auto-generated keywords for diversity"""
     chat = LlmChat(
         api_key=api_key,
-        
+        session_id=f"seo-{uuid.uuid4()}",
         system_message="Ești un expert SEO. Generezi titluri captivante bazate pe cuvinte cheie specifice. Scrii în limba ROMÂNĂ."
     ).with_model("gemini", "gemini-2.0-flash")
     
@@ -5345,7 +5345,7 @@ async def generate_automated_article(site: dict, user_id: str, send_email: bool 
             # Use AI to extract article ideas from analysis
             extract_chat = LlmChat(
                 api_key=api_key,
-                
+                session_id=f"seo-{uuid.uuid4()}",
                 system_message="Ești un expert SEO. Extragi idei de articole din analize."
             ).with_model("gemini", "gemini-2.0-flash")
             
@@ -5571,7 +5571,7 @@ INSTRUCȚIUNI IMPORTANTE PENTRU LINK-URI PRODUSE:
     
     chat = LlmChat(
         api_key=api_key,
-        
+        session_id=f"seo-{uuid.uuid4()}",
         system_message=f"""Ești un expert SEO content writer care scrie articole de înaltă calitate.
         Scrii articole LUNGI și DETALIATE de minimum {target_words} cuvinte.
         
@@ -7062,7 +7062,7 @@ IMPORTANT - LINKURI PRODUSE:
     # All articles in Romanian
     chat = LlmChat(
         api_key=api_key,
-        
+        session_id=f"seo-{uuid.uuid4()}",
         system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
         Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <a>
         NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
