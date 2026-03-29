@@ -17,7 +17,7 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 │   ├── plans.py           # Plan definitions and limits
 │   ├── models.py          # Pydantic models for SaaS
 │   ├── routes.py          # SaaS API routes (subscriptions, checkout, BYOAK)
-│   ├── admin_routes.py    # Admin API routes (users, stats, actions)
+│   ├── admin_routes.py    # Admin API routes (users, stats, actions, password reset)
 │   ├── subscription_service.py  # Business logic for subscriptions
 │   ├── email_service.py   # Email notifications (Resend)
 │   └── invoice_service.py # PDF invoice generation
@@ -30,7 +30,7 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 ├── pages/
 │   ├── LandingPage.jsx    # Public landing page at /
 │   ├── PricingPage.jsx    # Pricing comparison at /pricing
-│   ├── BillingPage.jsx    # Billing & BYOAK at /app/billing
+│   ├── BillingPage.jsx    # Billing, BYOAK & Security at /app/billing
 │   ├── AdminDashboard.jsx # Admin panel at /app/admin
 │   ├── ContactPage.jsx    # Contact page at /contact
 │   ├── TermsPage.jsx      # Terms at /terms
@@ -52,7 +52,16 @@ Collections:
 
 ## What's Been Implemented
 
-### Date: 2026-03-20 (Latest)
+### Date: 2026-03-29 (Latest)
+
+#### Password Management ✅
+- User password change: `/api/auth/change-password` - users can change their own password
+- Admin reset user password: `/api/admin/users/{user_id}/reset-password` - admin can reset any user's password
+- UI: Security tab in BillingPage (`/app/billing` -> tab "Securitate")
+- UI: Reset password dialog in AdminDashboard (`/app/admin` -> Users tab -> Key icon)
+- Validation: minimum 6 characters, current password verification
+
+### Date: 2026-03-20
 
 #### Admin Dashboard & Footer Pages ✅
 - Admin Dashboard at `/app/admin` with:
@@ -60,7 +69,7 @@ Collections:
   - Financial: Monthly Revenue, Trial Users, Active Today
   - Plan Breakdown distribution
   - User list with search, pagination
-  - Actions: Edit subscription (plan/status), Toggle admin role, Delete user
+  - Actions: Edit subscription (plan/status), Toggle admin role, Delete user, Reset password
 - Admin link in sidebar (red color, only visible to admin users)
 - Footer pages: `/contact`, `/terms`, `/privacy`
 - Footer links on Landing Page and Pricing Page
@@ -98,6 +107,13 @@ Collections:
 
 ## API Endpoints
 
+### Auth Endpoints
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/auth/me` - Get current user
+- `POST /api/auth/forgot-password` - Request password reset
+- `PUT /api/auth/change-password` - Change user password (requires auth)
+
 ### Admin Endpoints (require admin role)
 - `GET /api/admin/stats` - Platform statistics
 - `GET /api/admin/users` - List all users with subscription info
@@ -105,8 +121,12 @@ Collections:
 - `PATCH /api/admin/users/{user_id}/role` - Change user role
 - `PATCH /api/admin/users/{user_id}/subscription` - Edit subscription
 - `DELETE /api/admin/users/{user_id}` - Delete user and data
+- `POST /api/admin/users/{user_id}/reset-password` - Admin reset user password
+- `PUT /api/admin/change-password` - Admin change own password
 - `GET /api/admin/content` - Get editable page content
 - `PUT /api/admin/content/{page_id}` - Update page content
+- `GET /api/admin/platform-settings` - Get platform API keys status
+- `PUT /api/admin/platform-settings` - Update platform API keys
 
 ### SaaS Endpoints
 - `GET /api/saas/plans` - Get all plans
@@ -125,6 +145,8 @@ Collections:
 - ✅ Admin Dashboard implementation
 - ✅ Footer pages (Contact, Terms, Privacy)
 - ✅ Admin user management
+- ✅ User password change functionality
+- ✅ Admin password reset for users
 
 ### P1 (High) - Pending
 - [ ] Configure production Stripe keys on VPS
@@ -148,7 +170,7 @@ Collections:
 - Plan: Enterprise
 
 ### Test Account
-- Email: test@example.com
+- Email: test091853@example.com
 - Password: test123
 - Role: user
 
@@ -164,4 +186,12 @@ Collections:
 ```
 STRIPE_API_KEY=sk_live_... (production key)
 RESEND_API_KEY=re_... (production key)
+```
+
+### Deploy Commands for VPS
+```bash
+cd /var/www/seo-saas
+git pull origin main
+cd frontend && npm run build
+sudo systemctl restart seo-saas
 ```
