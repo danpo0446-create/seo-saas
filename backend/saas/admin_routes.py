@@ -501,3 +501,40 @@ async def change_admin_password(data: ChangePasswordRequest, admin: dict = Depen
     
     logging.info(f"[ADMIN] Password changed for {admin['email']}")
     return {"message": "Parola a fost schimbată cu succes"}
+
+
+# ============ ADMIN RESET USER PASSWORD ============
+
+class ResetUserPasswordRequest(BaseModel):
+    new_password: str
+
+
+@admin_router.post("/users/{user_id}/reset-password")
+async def admin_reset_user_password(user_id: str, data: ResetUserPasswordRequest, admin: dict = Depends(get_admin_user)):
+    """Admin resets a user's password manually"""
+    import bcrypt
+    db = get_db()
+    
+    # Find user
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizator negăsit")
+    
+    # Don't allow resetting another admin's password (optional protection)
+    if user.get("role") == "admin" and user["id"] != admin["id"]:
+        raise HTTPException(status_code=403, detail="Nu poți reseta parola unui alt administrator")
+    
+    # Validate new password
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Parola trebuie să aibă minim 6 caractere")
+    
+    # Hash and save new password
+    new_hashed = bcrypt.hashpw(data.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"password": new_hashed, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    logging.info(f"[ADMIN] Admin {admin['email']} reset password for user {user.get('email')}")
+    return {"message": f"Parola pentru {user.get('email')} a fost resetată cu succes"}

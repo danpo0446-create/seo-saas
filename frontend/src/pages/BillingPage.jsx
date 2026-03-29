@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   CreditCard, Package, Key, Check, AlertCircle, Loader2, 
   ExternalLink, Eye, EyeOff, Save, Trash2, Shield,
-  FileText, Globe, Calendar, Zap, ArrowUpRight, Download, Receipt
+  FileText, Globe, Calendar, Zap, ArrowUpRight, Download, Receipt, Lock
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -33,6 +33,14 @@ const BillingPage = () => {
   });
   const [savingKeys, setSavingKeys] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
+  
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -180,6 +188,37 @@ const BillingPage = () => {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast.error("Parolele noi nu coincid");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Parola nouă trebuie să aibă minim 6 caractere");
+      return;
+    }
+    
+    setChangingPassword(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(`${API}/auth/change-password`, {
+        current_password: currentPassword,
+        new_password: newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      toast.success("Parola a fost schimbată cu succes!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la schimbarea parolei");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       active: { label: "Activ", variant: "default", className: "bg-[#00E676] text-black" },
@@ -263,6 +302,10 @@ const BillingPage = () => {
           <TabsTrigger value="api-keys" className="data-[state=active]:bg-[#262626]">
             <Key className="w-4 h-4 mr-2" />
             Chei API (BYOAK)
+          </TabsTrigger>
+          <TabsTrigger value="security" className="data-[state=active]:bg-[#262626]">
+            <Lock className="w-4 h-4 mr-2" />
+            Securitate
           </TabsTrigger>
         </TabsList>
 
@@ -615,6 +658,103 @@ const BillingPage = () => {
                 )}
                 Salvează Cheile
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security" className="space-y-6">
+          <Card className="bg-[#0A0A0A] border-[#262626]">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Lock className="w-5 h-5 text-[#00E676]" />
+                Schimbă Parola
+              </CardTitle>
+              <CardDescription className="text-[#71717A]">
+                Actualizează parola contului tău pentru mai multă securitate
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm text-[#A1A1AA]">Parola curentă</label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Introdu parola actuală"
+                    className="w-full px-4 py-2 bg-[#171717] border border-[#262626] rounded-lg text-white pr-10 focus:outline-none focus:border-[#00E676]"
+                    data-testid="current-password-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                  >
+                    {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-[#A1A1AA]">Parola nouă</label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Minim 6 caractere"
+                    className="w-full px-4 py-2 bg-[#171717] border border-[#262626] rounded-lg text-white pr-10 focus:outline-none focus:border-[#00E676]"
+                    data-testid="new-password-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-[#A1A1AA]">Confirmă parola nouă</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repetă parola nouă"
+                  className="w-full px-4 py-2 bg-[#171717] border border-[#262626] rounded-lg text-white focus:outline-none focus:border-[#00E676]"
+                  data-testid="confirm-password-input"
+                />
+              </div>
+
+              <Button
+                onClick={handleChangePassword}
+                disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
+                data-testid="change-password-btn"
+              >
+                {changingPassword ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Lock className="w-4 h-4 mr-2" />
+                )}
+                Schimbă Parola
+              </Button>
+
+              <div className="p-4 bg-[#171717] rounded-lg border border-[#262626]">
+                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-[#00E676]" />
+                  Sfaturi pentru securitate
+                </h4>
+                <ul className="text-[#71717A] text-sm space-y-1">
+                  <li>• Folosește o parolă unică pentru acest cont</li>
+                  <li>• Include litere mari, mici, numere și simboluri</li>
+                  <li>• Nu împărtăși parola cu nimeni</li>
+                  <li>• Schimbă parola periodic</li>
+                </ul>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

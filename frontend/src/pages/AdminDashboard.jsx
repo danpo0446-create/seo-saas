@@ -45,8 +45,10 @@ const AdminDashboard = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [editPlan, setEditPlan] = useState("");
   const [editStatus, setEditStatus] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   // Content editing states
@@ -272,6 +274,36 @@ const AdminDashboard = () => {
   const handleDeleteUser = (user) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
+  };
+
+  const handleResetPassword = (user) => {
+    setSelectedUser(user);
+    setNewUserPassword("");
+    setShowResetPasswordDialog(true);
+  };
+
+  const resetUserPassword = async () => {
+    if (!selectedUser || !newUserPassword) return;
+    setActionLoading(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.post(
+        `${API}/admin/users/${selectedUser.id}/reset-password`,
+        { new_password: newUserPassword },
+        { headers }
+      );
+      
+      toast.success(`Parola pentru ${selectedUser.email} a fost resetată!`);
+      setShowResetPasswordDialog(false);
+      setNewUserPassword("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Eroare la resetare");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const saveUserChanges = async () => {
@@ -618,6 +650,16 @@ const AdminDashboard = () => {
                               data-testid={`toggle-admin-${user.id}`}
                             >
                               <UserCog className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleResetPassword(user)}
+                              className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                              title="Resetează Parola"
+                              data-testid={`reset-password-${user.id}`}
+                            >
+                              <Key className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -1222,6 +1264,54 @@ const AdminDashboard = () => {
               className="bg-red-500 hover:bg-red-600"
             >
               {actionLoading ? "Se sterge..." : "Sterge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+        <DialogContent className="bg-[#0A0A0A] border-[#262626]">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Key className="w-5 h-5 text-purple-500" />
+              Resetează Parola
+            </DialogTitle>
+            <DialogDescription className="text-[#71717A]">
+              Setează o parolă nouă pentru <strong className="text-white">{selectedUser?.email}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[#A1A1AA]">Parola nouă</Label>
+              <Input
+                type="text"
+                placeholder="Minim 6 caractere"
+                value={newUserPassword}
+                onChange={(e) => setNewUserPassword(e.target.value)}
+                className="bg-[#171717] border-[#262626] text-white"
+              />
+              <p className="text-[#71717A] text-xs">
+                Comunică noua parolă utilizatorului prin email sau telefon.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowResetPasswordDialog(false)}
+              className="border-[#262626]"
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={resetUserPassword}
+              disabled={actionLoading || !newUserPassword || newUserPassword.length < 6}
+              className="bg-purple-500 text-white hover:bg-purple-600"
+            >
+              {actionLoading ? "Se resetează..." : "Resetează Parola"}
             </Button>
           </DialogFooter>
         </DialogContent>

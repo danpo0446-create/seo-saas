@@ -603,6 +603,39 @@ async def forgot_password(data: ForgotPasswordRequest):
     return {"message": "Dacă există un cont cu acest email, vei primi instrucțiuni."}
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@api_router.put("/auth/change-password")
+async def change_user_password(data: ChangePasswordRequest, user: dict = Depends(get_current_user)):
+    """Change password for logged-in user"""
+    # Get user with password from DB
+    user_doc = await db.users.find_one({"id": user["id"]})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilizator negăsit")
+    
+    # Verify current password
+    if not verify_password(data.current_password, user_doc["password"]):
+        raise HTTPException(status_code=400, detail="Parola curentă este incorectă")
+    
+    # Validate new password
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
+    
+    # Hash and save new password
+    new_hashed = hash_password(data.new_password)
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password": new_hashed, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    logging.info(f"[AUTH] Password changed for user {user['email']}")
+    return {"message": "Parola a fost schimbată cu succes"}
+
+
 # ============ ARTICLES ROUTES ============
 
 import re
