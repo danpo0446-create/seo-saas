@@ -633,6 +633,11 @@ async def change_user_password(data: ChangePasswordRequest, user: dict = Depends
     )
     
     logging.info(f"[AUTH] Password changed for user {user['email']}")
+    
+    # Send email notification (async, non-blocking)
+    from saas.email_service import email_service
+    asyncio.create_task(email_service.send_password_changed(user['email'], user.get('name', 'Utilizator')))
+    
     return {"message": "Parola a fost schimbată cu succes"}
 
 

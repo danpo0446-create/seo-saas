@@ -60,6 +60,9 @@ Collections:
 - UI: Security tab in BillingPage (`/app/billing` -> tab "Securitate")
 - UI: Reset password dialog in AdminDashboard (`/app/admin` -> Users tab -> Key icon)
 - Validation: minimum 6 characters, current password verification
+- **Email notifications**: 
+  - User receives confirmation when changing own password
+  - User receives email with temp password when admin resets it
 
 ### Date: 2026-03-20
 

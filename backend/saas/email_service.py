@@ -298,6 +298,139 @@ TEMPLATES = {
 </body>
 </html>
 """
+    },
+    
+    "password_changed": {
+        "subject": "🔐 Parola ta a fost schimbată",
+        "html": """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #050505;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #050505; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; border-radius: 12px; border: 1px solid #262626;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 20px; text-align: center;">
+                            <div style="width: 60px; height: 60px; background-color: #00E676; border-radius: 12px; display: inline-block; line-height: 60px; font-size: 30px;">🔐</div>
+                            <h1 style="color: #FFFFFF; margin: 20px 0 0; font-size: 24px;">Parola a fost schimbată</h1>
+                        </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 20px 40px;">
+                            <p style="color: #A1A1AA; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                                Salut {name},
+                            </p>
+                            <p style="color: #A1A1AA; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                                Parola contului tău SEO Automation a fost schimbată cu succes la data de <strong style="color: #FFFFFF;">{changed_at}</strong>.
+                            </p>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #171717; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #00E676; font-size: 14px; margin: 0 0 10px;">✓ Schimbare confirmată</p>
+                                        <p style="color: #71717A; font-size: 13px; margin: 0;">
+                                            Dacă nu tu ai făcut această modificare, contactează-ne imediat la support@seoautomation.ro
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- CTA -->
+                    <tr>
+                        <td style="padding: 0 40px 40px; text-align: center;">
+                            <a href="{frontend_url}/login" style="display: inline-block; background-color: #00E676; color: #000000; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                                Autentifică-te
+                            </a>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px 40px; border-top: 1px solid #262626; text-align: center;">
+                            <p style="color: #525252; font-size: 13px; margin: 0;">
+                                © 2026 SEO Automation. Toate drepturile rezervate.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+    },
+    
+    "password_reset_by_admin": {
+        "subject": "🔑 Parola ta a fost resetată de administrator",
+        "html": """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #050505;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #050505; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; border-radius: 12px; border: 1px solid #262626;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 20px; text-align: center;">
+                            <div style="width: 60px; height: 60px; background-color: #FFA726; border-radius: 12px; display: inline-block; line-height: 60px; font-size: 30px;">🔑</div>
+                            <h1 style="color: #FFFFFF; margin: 20px 0 0; font-size: 24px;">Parola ta a fost resetată</h1>
+                        </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 20px 40px;">
+                            <p style="color: #A1A1AA; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                                Salut {name},
+                            </p>
+                            <p style="color: #A1A1AA; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                                Un administrator a resetat parola contului tău SEO Automation. Noua ta parolă temporară este:
+                            </p>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #171717; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #71717A; font-size: 13px; margin: 0 0 10px;">Parola temporară:</p>
+                                        <p style="color: #FFFFFF; font-size: 24px; font-family: monospace; margin: 0; letter-spacing: 2px;">{temp_password}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #FFA726; font-size: 14px; line-height: 1.6; margin: 20px 0;">
+                                ⚠️ Te rugăm să îți schimbi parola imediat după autentificare din motive de securitate.
+                            </p>
+                        </td>
+                    </tr>
+                    <!-- CTA -->
+                    <tr>
+                        <td style="padding: 0 40px 40px; text-align: center;">
+                            <a href="{frontend_url}/login" style="display: inline-block; background-color: #00E676; color: #000000; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                                Autentifică-te Acum
+                            </a>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px 40px; border-top: 1px solid #262626; text-align: center;">
+                            <p style="color: #525252; font-size: 13px; margin: 0;">
+                                © 2026 SEO Automation. Toate drepturile rezervate.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
     }
 }
 
@@ -388,6 +521,23 @@ class EmailService:
             "next_billing": next_billing.strftime("%d.%m.%Y"),
             "sites_limit": sites_str,
             "articles_limit": articles_str
+        })
+    
+    async def send_password_changed(self, email: str, name: str) -> bool:
+        """Send notification when user changes their own password"""
+        from datetime import datetime
+        
+        now = datetime.now()
+        return await self.send_email(email, "password_changed", {
+            "name": name,
+            "changed_at": now.strftime("%d.%m.%Y la ora %H:%M")
+        })
+    
+    async def send_password_reset_by_admin(self, email: str, name: str, temp_password: str) -> bool:
+        """Send notification when admin resets user password"""
+        return await self.send_email(email, "password_reset_by_admin", {
+            "name": name,
+            "temp_password": temp_password
         })
 
 

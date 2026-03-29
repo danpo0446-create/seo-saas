@@ -513,6 +513,7 @@ class ResetUserPasswordRequest(BaseModel):
 async def admin_reset_user_password(user_id: str, data: ResetUserPasswordRequest, admin: dict = Depends(get_admin_user)):
     """Admin resets a user's password manually"""
     import bcrypt
+    import asyncio
     db = get_db()
     
     # Find user
@@ -537,4 +538,13 @@ async def admin_reset_user_password(user_id: str, data: ResetUserPasswordRequest
     )
     
     logging.info(f"[ADMIN] Admin {admin['email']} reset password for user {user.get('email')}")
+    
+    # Send email notification to user (async, non-blocking)
+    from .email_service import email_service
+    asyncio.create_task(email_service.send_password_reset_by_admin(
+        user.get('email'),
+        user.get('name', 'Utilizator'),
+        data.new_password
+    ))
+    
     return {"message": f"Parola pentru {user.get('email')} a fost resetată cu succes"}
