@@ -70,7 +70,6 @@ async def chat(api_key: str, messages: list, model: str = "gpt-4o", session_id: 
     """Compatibility function for old chat API"""
     llm_chat = LlmChat(
         api_key=api_key,
-        session_id=session_id or f"session-{uuid.uuid4()}",
         system_message="You are a helpful AI assistant."
     )
     # Determine provider based on model
