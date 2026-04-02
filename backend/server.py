@@ -63,13 +63,19 @@ from saas.plans import get_plan, PLANS
 # Helper function to get user's API key (BYOAK first, then platform fallback for admin only)
 async def get_user_llm_key(user_id: str, is_admin: bool = False):
     """Get LLM API key - prioritizes user's BYOAK keys. Platform fallback only for admin."""
+    from saas.subscription_service import decrypt_api_key
+    
     user_keys = await db.user_api_keys.find_one({"user_id": user_id})
     
     if user_keys:
         if user_keys.get("openai_key"):
-            return user_keys["openai_key"], "openai", "gpt-4o"
-        elif user_keys.get("gemini_key"):
-            return user_keys["gemini_key"], "gemini", "gemini-2.0-flash"
+            decrypted_key = decrypt_api_key(user_keys["openai_key"])
+            if decrypted_key:
+                return decrypted_key, "openai", "gpt-4o"
+        if user_keys.get("gemini_key"):
+            decrypted_key = decrypt_api_key(user_keys["gemini_key"])
+            if decrypted_key:
+                return decrypted_key, "gemini", "gemini-2.0-flash"
     
     # Fallback to platform key ONLY for admin
     if is_admin:
