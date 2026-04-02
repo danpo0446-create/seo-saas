@@ -60,6 +60,24 @@ from saas.admin_routes import admin_router
 from saas.subscription_service import SubscriptionService, ApiKeyService
 from saas.plans import get_plan, PLANS
 
+# Helper function to get user's API key (BYOAK first, then platform fallback)
+async def get_user_llm_key(user_id: str):
+    """Get LLM API key - prioritizes user's BYOAK keys over platform key"""
+    user_keys = await db.user_api_keys.find_one({"user_id": user_id})
+    
+    if user_keys:
+        if user_keys.get("openai_key"):
+            return user_keys["openai_key"], "openai", "gpt-4o"
+        elif user_keys.get("gemini_key"):
+            return user_keys["gemini_key"], "gemini", "gemini-2.0-flash"
+    
+    # Fallback to platform key
+    platform_key = os.environ.get('EMERGENT_LLM_KEY')
+    if platform_key:
+        return platform_key, "gemini", "gemini-2.0-flash"
+    
+    return None, None, None
+
 # Compatibility layer for old chat() function
 @dataclass
 class Message:
@@ -703,9 +721,9 @@ async def generate_article(article: ArticleCreate, user: dict = Depends(get_curr
         )
     
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API pentru a adăuga una.")
         
         length_words = {"short": 500, "medium": 1000, "long": 2000}
         target_words = length_words.get(article.length, 1000)
@@ -751,13 +769,12 @@ IMPORTANT: Integrează 3-5 linkuri către produse NATURAL în text folosind <a h
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"article-{uuid.uuid4()}",
             system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
             Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <a>
             NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
             NU folosești markdown. Doar tag-uri HTML de conținut.
             Scrii articole LUNGI și DETALIATE de minimum {target_words} cuvinte."""
-        ).with_model("gemini", "gemini-2.0-flash")
+        ).with_model(model_provider, model_name)
         
         prompt = f"""Scrie un articol SEO LUNG și DETALIAT în limba ROMÂNĂ.
 
@@ -854,9 +871,9 @@ async def regenerate_article(article_id: str, user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Article not found")
     
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
         keywords = article.get("keywords", [])
         niche = article.get("niche", "general")
@@ -864,13 +881,12 @@ async def regenerate_article(article_id: str, user: dict = Depends(get_current_u
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"article-regen-{uuid.uuid4()}",
             system_message=f"""Ești un expert în scriere de conținut SEO. Scrii NUMAI în limba ROMÂNĂ.
             Folosești DOAR tag-uri HTML pentru conținut: <h2>, <h3>, <p>, <ul>, <li>, <strong>
             NU folosești: <!DOCTYPE>, <html>, <head>, <body>, <meta>, <title>, <style>
             NU folosești markdown. Doar tag-uri HTML de conținut.
             Scrii articole LUNGI și DETALIATE de minimum {target_words} cuvinte."""
-        ).with_model("gemini", "gemini-2.0-flash")
+        ).with_model(model_provider, model_name)
         
         prompt = f"""Scrie un articol SEO LUNG și DETALIAT în limba ROMÂNĂ.
 
@@ -1397,16 +1413,15 @@ async def delete_calendar_entry(entry_id: str, user: dict = Depends(get_current_
 @api_router.post("/calendar/generate-90-days")
 async def generate_90_day_calendar(niche: str, site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"calendar-{uuid.uuid4()}",
             system_message="""You are an SEO content strategist. Generate editorial calendar entries.
             Return ONLY a JSON array, no other text."""
-        ).with_model("gemini", "gemini-2.0-flash")
+        ).with_model(model_provider, model_name)
         
         prompt = f"""Generate 30 article topics for a 90-day editorial calendar for the niche: {niche}
         
@@ -1462,16 +1477,15 @@ Generate 30 diverse, SEO-friendly topics. JSON array only:"""
 async def generate_backlinks_for_niche(niche: str, user: dict = Depends(get_current_user)):
     """Generate AI-powered backlink suggestions for a specific niche"""
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"backlinks-{uuid.uuid4()}",
             system_message="""You are an SEO expert specializing in backlink research. Generate realistic backlink opportunities.
             Return ONLY a JSON array with backlink sites, no other text."""
-        ).with_model("gemini", "gemini-2.0-flash")
+        ).with_model(model_provider, model_name)
         
         prompt = f"""Generate 30 realistic backlink opportunities for the niche: {niche}
 
@@ -3259,18 +3273,17 @@ async def generate_site_keywords(site_id: str, user: dict = Depends(get_current_
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key, model_provider, model_name = await get_user_llm_key(user["id"])
     if not api_key:
-        raise HTTPException(status_code=500, detail="API key not configured")
+        raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
     
     niche = site.get("niche", "general")
     site_name = site.get("site_name", site.get("site_url", ""))
     
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"keywords-site-{uuid.uuid4()}",
         system_message="Ești un expert SEO. Generezi cuvinte cheie relevante în limba ROMÂNĂ."
-    ).with_model("gemini", "gemini-2.0-flash")
+    ).with_model(model_provider, model_name)
     
     prompt = f"""Generează 20 de cuvinte cheie SEO relevante pentru un site cu:
 Nume: {site_name}
@@ -4588,20 +4601,19 @@ async def generate_article_from_template(
         raise HTTPException(status_code=404, detail="Template not found")
     
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
         # Build prompt from template
         custom_prompt = template["prompt_template"].replace("{topic}", topic)
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"article-template-{uuid.uuid4()}",
             system_message="""You are an expert SEO content writer. Generate high-quality, SEO-optimized articles in clean HTML format.
             Use proper HTML tags: <h2>, <h3> for headings, <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis.
             Do NOT use markdown. Output clean HTML only."""
-        ).with_model("gemini", "gemini-2.0-flash")
+        ).with_model(model_provider, model_name)
         
         length_words = {"short": 500, "medium": 1000, "long": 2000}
         target_words = length_words.get(template["default_length"], 1000)
@@ -6339,9 +6351,9 @@ async def run_business_analysis(
     if not url:
         raise HTTPException(status_code=400, detail="URL este obligatoriu")
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key, _, _ = await get_user_llm_key(user["id"])
     if not api_key:
-        raise HTTPException(status_code=500, detail="API key pentru AI nu este configurat")
+        raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
     
     # Generate analysis
     result = await generate_business_analysis(url, niche, api_key)
@@ -6414,9 +6426,9 @@ async def run_auto_fix(
     if not site_id and not url:
         raise HTTPException(status_code=400, detail="Site ID sau URL este obligatoriu")
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key, _, _ = await get_user_llm_key(user["id"])
     if not api_key:
-        raise HTTPException(status_code=500, detail="API key pentru AI nu este configurat")
+        raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
     
     # Get WordPress credentials
     if site_id:
