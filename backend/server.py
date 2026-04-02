@@ -1001,17 +1001,36 @@ async def delete_article(article_id: str, user: dict = Depends(get_current_user)
 @api_router.post("/keywords/research", response_model=List[KeywordResponse])
 async def research_keywords(research: KeywordResearch, user: dict = Depends(get_current_user)):
     try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get user's BYOAK key first, fallback to platform key
+        user_keys = await db.user_api_keys.find_one({"user_id": user["id"]})
+        api_key = None
+        model_provider = "openai"
+        model_name = "gpt-4o"
+        
+        if user_keys:
+            if user_keys.get("openai_key"):
+                api_key = user_keys["openai_key"]
+                model_provider = "openai"
+                model_name = "gpt-4o"
+            elif user_keys.get("gemini_key"):
+                api_key = user_keys["gemini_key"]
+                model_provider = "gemini"
+                model_name = "gemini-2.0-flash"
+        
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            api_key = os.environ.get('EMERGENT_LLM_KEY')
+            model_provider = "gemini"
+            model_name = "gemini-2.0-flash"
+        
+        if not api_key:
+            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API pentru a adăuga una.")
         
         chat = LlmChat(
             api_key=api_key,
-            session_id=f"keywords-{uuid.uuid4()}",
             system_message="""You are an SEO keyword research expert. Generate realistic keyword suggestions with estimated metrics.
             Return ONLY a JSON array with keywords in this exact format, no other text:
             [{"keyword": "example keyword", "volume": 1000, "difficulty": 45, "cpc": 1.50, "trend": "up"}]"""
-        ).with_model("gemini", "gemini-2.0-flash")
+        ).with_model(model_provider, model_name)
         
         seed_str = ', '.join(research.seed_keywords) if research.seed_keywords else 'general terms'
         prompt = f"""Generate 10 SEO keywords for the niche: {research.niche}
