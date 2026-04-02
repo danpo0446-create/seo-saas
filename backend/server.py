@@ -60,9 +60,9 @@ from saas.admin_routes import admin_router
 from saas.subscription_service import SubscriptionService, ApiKeyService
 from saas.plans import get_plan, PLANS
 
-# Helper function to get user's API key (BYOAK first, then platform fallback)
-async def get_user_llm_key(user_id: str):
-    """Get LLM API key - prioritizes user's BYOAK keys over platform key"""
+# Helper function to get user's API key (BYOAK first, then platform fallback for admin only)
+async def get_user_llm_key(user_id: str, is_admin: bool = False):
+    """Get LLM API key - prioritizes user's BYOAK keys. Platform fallback only for admin."""
     user_keys = await db.user_api_keys.find_one({"user_id": user_id})
     
     if user_keys:
@@ -71,10 +71,11 @@ async def get_user_llm_key(user_id: str):
         elif user_keys.get("gemini_key"):
             return user_keys["gemini_key"], "gemini", "gemini-2.0-flash"
     
-    # Fallback to platform key
-    platform_key = os.environ.get('EMERGENT_LLM_KEY')
-    if platform_key:
-        return platform_key, "gemini", "gemini-2.0-flash"
+    # Fallback to platform key ONLY for admin
+    if is_admin:
+        platform_key = os.environ.get('EMERGENT_LLM_KEY')
+        if platform_key:
+            return platform_key, "gemini", "gemini-2.0-flash"
     
     return None, None, None
 
@@ -721,7 +722,7 @@ async def generate_article(article: ArticleCreate, user: dict = Depends(get_curr
         )
     
     try:
-        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
         if not api_key:
             raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API pentru a adăuga una.")
         
@@ -871,7 +872,7 @@ async def regenerate_article(article_id: str, user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Article not found")
     
     try:
-        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
         if not api_key:
             raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
@@ -1017,29 +1018,10 @@ async def delete_article(article_id: str, user: dict = Depends(get_current_user)
 @api_router.post("/keywords/research", response_model=List[KeywordResponse])
 async def research_keywords(research: KeywordResearch, user: dict = Depends(get_current_user)):
     try:
-        # Get user's BYOAK key first, fallback to platform key
-        user_keys = await db.user_api_keys.find_one({"user_id": user["id"]})
-        api_key = None
-        model_provider = "openai"
-        model_name = "gpt-4o"
-        
-        if user_keys:
-            if user_keys.get("openai_key"):
-                api_key = user_keys["openai_key"]
-                model_provider = "openai"
-                model_name = "gpt-4o"
-            elif user_keys.get("gemini_key"):
-                api_key = user_keys["gemini_key"]
-                model_provider = "gemini"
-                model_name = "gemini-2.0-flash"
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
         
         if not api_key:
-            api_key = os.environ.get('EMERGENT_LLM_KEY')
-            model_provider = "gemini"
-            model_name = "gemini-2.0-flash"
-        
-        if not api_key:
-            raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API pentru a adăuga una.")
+            raise HTTPException(status_code=400, detail="Nu ai configurat o cheie API (OpenAI sau Gemini). Mergi la Chei API pentru a adăuga una.")
         
         chat = LlmChat(
             api_key=api_key,
@@ -1413,7 +1395,7 @@ async def delete_calendar_entry(entry_id: str, user: dict = Depends(get_current_
 @api_router.post("/calendar/generate-90-days")
 async def generate_90_day_calendar(niche: str, site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
     try:
-        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
         if not api_key:
             raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
@@ -1477,7 +1459,7 @@ Generate 30 diverse, SEO-friendly topics. JSON array only:"""
 async def generate_backlinks_for_niche(niche: str, user: dict = Depends(get_current_user)):
     """Generate AI-powered backlink suggestions for a specific niche"""
     try:
-        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
         if not api_key:
             raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
@@ -3273,7 +3255,7 @@ async def generate_site_keywords(site_id: str, user: dict = Depends(get_current_
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    api_key, model_provider, model_name = await get_user_llm_key(user["id"])
+    api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
     if not api_key:
         raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
     
@@ -4601,7 +4583,7 @@ async def generate_article_from_template(
         raise HTTPException(status_code=404, detail="Template not found")
     
     try:
-        api_key, model_provider, model_name = await get_user_llm_key(user["id"])
+        api_key, model_provider, model_name = await get_user_llm_key(user["id"], user.get("role") == "admin")
         if not api_key:
             raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
         
@@ -6351,7 +6333,7 @@ async def run_business_analysis(
     if not url:
         raise HTTPException(status_code=400, detail="URL este obligatoriu")
     
-    api_key, _, _ = await get_user_llm_key(user["id"])
+    api_key, _, _ = await get_user_llm_key(user["id"], user.get("role") == "admin")
     if not api_key:
         raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
     
@@ -6426,7 +6408,7 @@ async def run_auto_fix(
     if not site_id and not url:
         raise HTTPException(status_code=400, detail="Site ID sau URL este obligatoriu")
     
-    api_key, _, _ = await get_user_llm_key(user["id"])
+    api_key, _, _ = await get_user_llm_key(user["id"], user.get("role") == "admin")
     if not api_key:
         raise HTTPException(status_code=500, detail="Nu ai configurat o cheie API. Mergi la Chei API.")
     
