@@ -52,7 +52,18 @@ Collections:
 
 ## What's Been Implemented
 
-### Date: 2026-03-29 (Latest)
+### Date: 2026-04-02 (Latest)
+
+#### Backlink Automation Module ✅
+- **NEW** `BacklinkAutomationPage.jsx` - Pagină monitorizare automatizare backlinks
+- **NEW** `GET /api/backlinks/automation-status` - Status automatizare per site
+- **NEW** `run_daily_backlink_outreach()` - Automatizare zilnică la 12:30 România
+- **NEW** Scheduler CronTrigger pentru outreach la 12:30
+- Features: Max 15 emailuri/zi/site, oportunități FREE only, emailuri personalizate AI
+- Route: `/app/backlinks/automation`
+- Link în sidebar după "Backlinks"
+
+### Date: 2026-03-29
 
 #### Password Management ✅
 - User password change: `/api/auth/change-password` - users can change their own password

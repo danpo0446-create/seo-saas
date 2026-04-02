@@ -12,6 +12,7 @@ import ArticleGeneratorPage from "@/pages/ArticleGeneratorPage";
 import KeywordsPage from "@/pages/KeywordsPage";
 import CalendarPage from "@/pages/CalendarPage";
 import BacklinksPage from "@/pages/BacklinksPage";
+import BacklinkAutomationPage from "@/pages/BacklinkAutomationPage";
 import Web2Page from "@/pages/Web2Page";
 import WordPressPage from "@/pages/WordPressPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -102,6 +103,7 @@ function App() {
               <Route path="keywords" element={<KeywordsPage />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="backlinks" element={<BacklinksPage />} />
+              <Route path="backlinks/automation" element={<BacklinkAutomationPage />} />
               <Route path="web2" element={<Web2Page />} />
               <Route path="wordpress" element={<WordPressPage />} />
               <Route path="automation" element={<AutomationPage />} />

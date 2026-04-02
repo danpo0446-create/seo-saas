@@ -42,6 +42,7 @@ const navItems = [
   { path: '/app/keywords', icon: Search, label: 'Cuvinte-cheie' },
   { path: '/app/calendar', icon: Calendar, label: 'Calendar Editorial' },
   { path: '/app/backlinks', icon: Link, label: 'Backlinks' },
+  { path: '/app/backlinks/automation', icon: Bot, label: 'Automatizare Backlinks' },
   { path: '/app/web2', icon: Share2, label: 'Web 2.0 Links', adminOnly: true },
   { path: '/app/wordpress', icon: Globe, label: 'Site-uri WordPress' },
   { path: '/app/automation', icon: Bot, label: 'Automatizare' },

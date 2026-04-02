@@ -2033,6 +2033,119 @@ async def get_outreach_stats(user: dict = Depends(get_current_user)):
         "total": pending + sent + responded + rejected
     }
 
+
+# ============ BACKLINK AUTOMATION STATUS ============
+
+@api_router.get("/backlinks/automation-status")
+async def get_backlink_automation_status(user: dict = Depends(get_current_user)):
+    """Get backlink automation status for all sites"""
+    
+    # Get user's sites
+    sites = await db.wordpress_configs.find(
+        {"user_id": user["id"]},
+        {"_id": 0, "id": 1, "site_name": 1, "site_url": 1, "niche": 1}
+    ).to_list(100)
+    
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+    week_ago = today_start - timedelta(days=7)
+    
+    sites_status = []
+    total_emails_today = 0
+    total_emails_7_days = 0
+    last_outreach = None
+    
+    for site in sites:
+        site_id = site.get("id")
+        niche = site.get("niche", "")
+        
+        # Emails sent today for this site
+        emails_today = await db.backlink_outreach.count_documents({
+            "user_id": user["id"],
+            "site_id": site_id,
+            "status": "sent",
+            "sent_at": {"$gte": today_start.isoformat()}
+        })
+        
+        # Emails sent yesterday
+        emails_yesterday = await db.backlink_outreach.count_documents({
+            "user_id": user["id"],
+            "site_id": site_id,
+            "status": "sent",
+            "sent_at": {"$gte": yesterday_start.isoformat(), "$lt": today_start.isoformat()}
+        })
+        
+        # Emails sent last 7 days
+        emails_7_days = await db.backlink_outreach.count_documents({
+            "user_id": user["id"],
+            "site_id": site_id,
+            "status": "sent",
+            "sent_at": {"$gte": week_ago.isoformat()}
+        })
+        
+        # Total FREE opportunities for this niche
+        free_opportunities = await db.niche_backlinks.count_documents({
+            "user_id": user["id"],
+            "niche": niche,
+            "$or": [
+                {"is_free": True},
+                {"price": "Free"},
+                {"price": 0},
+                {"price": {"$regex": "free", "$options": "i"}}
+            ]
+        })
+        
+        # Responses received
+        responses = await db.backlink_outreach.count_documents({
+            "user_id": user["id"],
+            "site_id": site_id,
+            "status": "responded"
+        })
+        
+        # New opportunities found today
+        new_opportunities = await db.niche_backlinks.count_documents({
+            "user_id": user["id"],
+            "niche": niche,
+            "created_at": {"$gte": today_start.isoformat()}
+        })
+        
+        # Last outreach for this site
+        last_site_outreach = await db.backlink_outreach.find_one(
+            {"user_id": user["id"], "site_id": site_id, "status": "sent"},
+            {"_id": 0, "sent_at": 1},
+            sort=[("sent_at", -1)]
+        )
+        
+        if last_site_outreach and last_site_outreach.get("sent_at"):
+            if not last_outreach or last_site_outreach["sent_at"] > last_outreach:
+                last_outreach = last_site_outreach["sent_at"]
+        
+        total_emails_today += emails_today
+        total_emails_7_days += emails_7_days
+        
+        sites_status.append({
+            "site_id": site_id,
+            "site_name": site.get("site_name") or site.get("site_url", "Unknown"),
+            "niche": niche,
+            "emails_sent_today": emails_today,
+            "emails_sent_yesterday": emails_yesterday,
+            "emails_sent_7_days": emails_7_days,
+            "remaining_today": max(0, 15 - emails_today),
+            "total_free_opportunities": free_opportunities,
+            "responses_received": responses,
+            "new_opportunities_today": new_opportunities
+        })
+    
+    return {
+        "sites": sites_status,
+        "total_emails_today": total_emails_today,
+        "total_emails_7_days": total_emails_7_days,
+        "last_outreach": last_outreach,
+        "next_run": "12:30 (ora României)",
+        "max_emails_per_site_per_day": 15
+    }
+
+
 # ============ WEB 2.0 BACKLINK SYSTEM ============
 
 class Web2Config(BaseModel):
@@ -7504,6 +7617,15 @@ async def startup_event():
     )
     logging.info("Scheduled daily backlink search at 6:00 AM")
     
+    # Schedule DAILY backlink outreach at 12:30 (after articles are published)
+    scheduler.add_job(
+        run_daily_backlink_outreach,
+        CronTrigger(hour=12, minute=30, timezone=ROMANIA_TZ),
+        id="daily_backlink_outreach",
+        replace_existing=True
+    )
+    logging.info("Scheduled daily backlink outreach at 12:30 PM")
+    
     # Schedule daily keyword generation (every day at 5:00 AM)
     scheduler.add_job(
         auto_generate_keywords_for_all_sites,
@@ -8083,6 +8205,184 @@ async def search_new_backlink_opportunities():
                 logging.error(f"[BACKLINKS] Error searching backlinks for {niche}: {e}")
     
     logging.info("[BACKLINKS] Daily backlink search completed")
+
+
+async def run_daily_backlink_outreach():
+    """Daily automation at 12:30: Send outreach emails to FREE opportunities (max 15/day/site)"""
+    logging.info("[BACKLINK OUTREACH] Starting daily backlink outreach at 12:30 Romania time...")
+    
+    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not llm_api_key:
+        logging.error("[BACKLINK OUTREACH] No LLM API key")
+        return
+    
+    if not RESEND_API_KEY:
+        logging.warning("[BACKLINK OUTREACH] No Resend API key - emails will be saved as drafts")
+    
+    # Get all users with WordPress sites
+    users = await db.users.find({}, {"_id": 0, "id": 1, "email": 1, "name": 1}).to_list(1000)
+    
+    for user in users:
+        user_id = user["id"]
+        user_email = user.get("email", "")
+        user_name = user.get("name", "SEO Team")
+        
+        # Get user's sites
+        sites = await db.wordpress_configs.find(
+            {"user_id": user_id},
+            {"_id": 0, "id": 1, "site_url": 1, "site_name": 1, "niche": 1}
+        ).to_list(100)
+        
+        for site in sites:
+            site_id = site.get("id")
+            site_name = site.get("site_name") or site.get("site_url", "Unknown")
+            niche = site.get("niche")
+            
+            if not niche:
+                logging.warning(f"[BACKLINK OUTREACH] Site {site_name} has no niche, skipping")
+                continue
+            
+            logging.info(f"[BACKLINK OUTREACH] Processing site: {site_name} ({niche})")
+            
+            try:
+                # Check how many emails sent today for this site
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                emails_sent_today = await db.backlink_outreach.count_documents({
+                    "user_id": user_id,
+                    "site_id": site_id,
+                    "status": "sent",
+                    "sent_at": {"$gte": today_start.isoformat()}
+                })
+                
+                remaining_emails = 15 - emails_sent_today
+                if remaining_emails <= 0:
+                    logging.info(f"[BACKLINK OUTREACH] Site {site_name}: Already sent 15 emails today, skipping")
+                    continue
+                
+                # Get FREE opportunities that haven't been contacted yet
+                contacted_domains = await db.backlink_outreach.distinct(
+                    "backlink_domain",
+                    {"user_id": user_id, "site_id": site_id}
+                )
+                
+                free_opportunities = await db.niche_backlinks.find({
+                    "niche": niche,
+                    "user_id": user_id,
+                    "$or": [
+                        {"is_free": True},
+                        {"price": 0},
+                        {"price": "Free"},
+                        {"price": {"$regex": "free", "$options": "i"}}
+                    ],
+                    "domain": {"$nin": contacted_domains}
+                }, {"_id": 0}).to_list(remaining_emails)
+                
+                if not free_opportunities:
+                    logging.info(f"[BACKLINK OUTREACH] Site {site_name}: No new free opportunities to contact")
+                    continue
+                
+                # Get different articles for variety
+                articles = await db.articles.find(
+                    {"user_id": user_id, "site_id": site_id, "status": "published"},
+                    {"_id": 0, "id": 1, "title": 1, "wordpress_url": 1}
+                ).sort("created_at", -1).to_list(20)
+                
+                if not articles:
+                    logging.warning(f"[BACKLINK OUTREACH] Site {site_name}: No published articles for outreach")
+                    continue
+                
+                emails_sent = 0
+                for i, opportunity in enumerate(free_opportunities):
+                    if emails_sent >= remaining_emails:
+                        break
+                    
+                    # Use different articles (rotate through them)
+                    article = articles[i % len(articles)]
+                    article_url = article.get("wordpress_url") or f"{site.get('site_url', '')}"
+                    
+                    contact_email = opportunity.get("contact_info", "")
+                    if not contact_email or "@" not in contact_email:
+                        continue
+                    
+                    try:
+                        # Generate personalized outreach email
+                        email_response = await chat(
+                            api_key=llm_api_key,
+                            messages=[Message(role="user", content=f"""
+                                Write a professional, personalized outreach email for a backlink request.
+                                
+                                My site: {site_name}
+                                My article: "{article.get('title')}"
+                                Article URL: {article_url}
+                                Target site: {opportunity.get('domain')}
+                                Opportunity type: {opportunity.get('type')}
+                                
+                                Make the email:
+                                - Short and professional (max 150 words)
+                                - Personalized to the target site
+                                - Explain why a link would benefit their readers
+                                - Include a clear call to action
+                                
+                                Return ONLY the email body, no subject line.
+                            """)],
+                            model="gpt-4o",
+                            session_id=f"outreach-{uuid.uuid4()}"
+                        )
+                        
+                        email_body = email_response
+                        subject = f"Collaboration opportunity - {article.get('title', 'Guest Post')[:50]}"
+                        
+                        # Save outreach record
+                        outreach_doc = {
+                            "id": str(uuid.uuid4()),
+                            "user_id": user_id,
+                            "site_id": site_id,
+                            "backlink_domain": opportunity.get("domain"),
+                            "contact_email": contact_email,
+                            "article_id": article.get("id"),
+                            "article_title": article.get("title"),
+                            "article_url": article_url,
+                            "email_subject": subject,
+                            "email_body": email_body,
+                            "status": "sent" if RESEND_API_KEY else "draft",
+                            "sent_at": datetime.now(timezone.utc).isoformat() if RESEND_API_KEY else None,
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        }
+                        
+                        # Send the email if Resend is configured
+                        if RESEND_API_KEY:
+                            resend.Emails.send({
+                                "from": f"{site_name} <{SENDER_EMAIL}>",
+                                "to": [contact_email],
+                                "subject": subject,
+                                "html": f"""
+                                    <div style="font-family: Arial, sans-serif; max-width: 600px;">
+                                        {email_body.replace(chr(10), '<br>')}
+                                        <br><br>
+                                        <p style="color: #666; font-size: 12px;">
+                                            Sent from {site_name}
+                                        </p>
+                                    </div>
+                                """
+                            })
+                        
+                        await db.backlink_outreach.insert_one(outreach_doc)
+                        emails_sent += 1
+                        logging.info(f"[BACKLINK OUTREACH] Site {site_name}: {'Sent' if RESEND_API_KEY else 'Saved'} email to {opportunity.get('domain')}")
+                        
+                        # Small delay between emails
+                        await asyncio.sleep(2)
+                        
+                    except Exception as e:
+                        logging.error(f"[BACKLINK OUTREACH] Site {site_name}: Failed email to {opportunity.get('domain')} - {e}")
+                
+                logging.info(f"[BACKLINK OUTREACH] Site {site_name}: Processed {emails_sent} outreach emails")
+                
+            except Exception as e:
+                logging.error(f"[BACKLINK OUTREACH] Site {site_name}: Error in outreach - {e}")
+    
+    logging.info("[BACKLINK OUTREACH] Daily backlink outreach completed")
+
 
 async def send_monthly_seo_reports():
     """Send monthly SEO performance reports to all users"""
