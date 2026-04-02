@@ -85,6 +85,47 @@ async def get_user_llm_key(user_id: str, is_admin: bool = False):
     
     return None, None, None
 
+# Helper function to get user's email API key (Resend or SendGrid)
+async def get_user_email_key(user_id: str, is_admin: bool = False):
+    """Get email API key - prioritizes user's BYOAK keys. Platform fallback only for admin."""
+    from saas.subscription_service import decrypt_api_key
+    
+    user_keys = await db.user_api_keys.find_one({"user_id": user_id})
+    
+    if user_keys:
+        if user_keys.get("resend_key"):
+            decrypted_key = decrypt_api_key(user_keys["resend_key"])
+            if decrypted_key:
+                return decrypted_key, "resend"
+        if user_keys.get("sendgrid_key"):
+            decrypted_key = decrypt_api_key(user_keys["sendgrid_key"])
+            if decrypted_key:
+                return decrypted_key, "sendgrid"
+    
+    # Fallback to platform key ONLY for admin
+    if is_admin:
+        if RESEND_API_KEY:
+            return RESEND_API_KEY, "resend"
+    
+    return None, None
+
+
+# Helper function to get user's Pexels API key
+async def get_user_pexels_key(user_id: str, is_admin: bool = False):
+    """Get Pexels API key - prioritizes user's BYOAK key."""
+    from saas.subscription_service import decrypt_api_key
+    
+    user_keys = await db.user_api_keys.find_one({"user_id": user_id})
+    
+    if user_keys and user_keys.get("pexels_key"):
+        decrypted_key = decrypt_api_key(user_keys["pexels_key"])
+        if decrypted_key:
+            return decrypted_key
+    
+    # No platform fallback for Pexels
+    return None
+
+
 # Compatibility layer for old chat() function
 @dataclass
 class Message:
@@ -1798,13 +1839,15 @@ async def send_outreach_email(
     if not outreach.get('contact_email'):
         raise HTTPException(status_code=400, detail="No contact email available")
     
+    # Get user's email API key (BYOAK)
+    email_key, email_provider = await get_user_email_key(user["id"], user.get("role") == "admin")
+    
+    if not email_key:
+        raise HTTPException(status_code=400, detail="Nu ai configurat o cheie API pentru email (Resend sau SendGrid). Mergi la Chei API pentru a adăuga una.")
+    
     # Get user info for sender name
     user_doc = await db.users.find_one({"id": user["id"]}, {"_id": 0})
     sender_name = user_doc.get('name', 'SEO Team') if user_doc else 'SEO Team'
-    
-    # Send email using Resend
-    if not RESEND_API_KEY:
-        raise HTTPException(status_code=500, detail="Email service not configured")
     
     try:
         email_html = f"""
@@ -1813,12 +1856,26 @@ async def send_outreach_email(
         </div>
         """
         
-        resend.Emails.send({
-            "from": f"{sender_name} <{SENDER_EMAIL}>",
-            "to": [outreach['contact_email']],
-            "subject": outreach['email_subject'],
-            "html": email_html
-        })
+        if email_provider == "resend":
+            import resend as resend_lib
+            resend_lib.api_key = email_key
+            resend_lib.Emails.send({
+                "from": f"{sender_name} <{SENDER_EMAIL}>",
+                "to": [outreach['contact_email']],
+                "subject": outreach['email_subject'],
+                "html": email_html
+            })
+        elif email_provider == "sendgrid":
+            import sendgrid
+            from sendgrid.helpers.mail import Mail, Email, To, Content
+            sg = sendgrid.SendGridAPIClient(api_key=email_key)
+            message = Mail(
+                from_email=Email(SENDER_EMAIL, sender_name),
+                to_emails=To(outreach['contact_email']),
+                subject=outreach['email_subject'],
+                html_content=Content("text/html", email_html)
+            )
+            sg.send(message)
         
         # Update status
         await db.backlink_outreach.update_one(
@@ -3491,7 +3548,13 @@ async def publish_to_wordpress(article_id: str, site_id: Optional[str] = None, u
         # Fetch images for article - pass article_id for uniqueness
         keywords = article.get("keywords", [])
         logging.info(f"Fetching images for keywords: {keywords}, niche: {niche}")
-        images = await fetch_images_for_article(keywords, niche, count=6, article_id=article_id)
+        
+        # Get user's Pexels key (BYOAK) or use platform key
+        pexels_key = await get_user_pexels_key(user["id"], user.get("role") == "admin")
+        if not pexels_key:
+            pexels_key = PEXELS_API_KEY  # Fallback to platform key for images
+        
+        images = await fetch_images_for_article(keywords, niche, count=6, article_id=article_id, pexels_key=pexels_key)
         logging.info(f"Fetched {len(images)} images")
         
         # Fetch and upload images
@@ -4731,11 +4794,17 @@ def normalize_niche_to_romanian(niche: str) -> str:
 
 # ============ IMAGE FUNCTIONS (Pexels - Free) ============
 
-async def fetch_images_for_article(keywords: List[str], niche: str, count: int = 6, article_id: str = "") -> List[dict]:
+async def fetch_images_for_article(keywords: List[str], niche: str, count: int = 6, article_id: str = "", pexels_key: str = None) -> List[dict]:
     """Fetch free professional images from Pexels - LARGE SIZE, UNIQUE per article"""
     import random
     images = []
     used_photo_ids = set()
+    
+    # Use provided key or fallback to platform key
+    api_key = pexels_key or PEXELS_API_KEY
+    if not api_key:
+        logging.warning("[IMAGES] No Pexels API key available")
+        return images
     
     # Normalize niche - extract key words from long descriptions
     niche_lower = niche.lower()
@@ -4837,7 +4906,7 @@ async def fetch_images_for_article(keywords: List[str], niche: str, count: int =
                 
                 response = await client.get(
                     "https://api.pexels.com/v1/search",
-                    headers={"Authorization": PEXELS_API_KEY},
+                    headers={"Authorization": api_key},
                     params={
                         "query": clean_term, 
                         "per_page": 30,  # Get more results for variety
