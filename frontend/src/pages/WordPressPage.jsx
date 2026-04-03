@@ -69,7 +69,15 @@ export default function WordPressPage() {
     } else if (success === 'linkedin_connected') {
       toast.success('LinkedIn conectat cu succes!');
     } else if (error) {
-      toast.error(`Eroare la conectare: ${error}`);
+      // User-friendly error messages
+      const errorMessages = {
+        'no_facebook_pages': 'Nu s-au găsit pagini Facebook. Aplicația ta Facebook trebuie să fie de tip Business cu use case "Manage and access Page content".',
+        'facebook_token_error': 'Eroare la obținerea token-ului Facebook. Verifică App ID și App Secret.',
+        'facebook_credentials_missing': 'Lipsesc credențialele Facebook. Configurează App ID și App Secret în Chei API.',
+        'missing_code_or_state': 'Eroare de autentificare Facebook. Încearcă din nou.',
+      };
+      const message = errorMessages[error] || `Eroare la conectare: ${error.replace(/_/g, ' ')}`;
+      toast.error(message, { duration: 8000 });
     }
   }, [searchParams]);
 
@@ -874,7 +882,7 @@ export default function WordPressPage() {
                     <div>
                       <h4 className="font-medium">Facebook Page</h4>
                       <p className="text-xs text-muted-foreground">
-                        {socialStatus.facebook?.page_name || 'Pagina asociată site-ului'}
+                        {socialStatus.facebook?.page_name || 'Postare automată pe pagina Facebook'}
                       </p>
                     </div>
                   </div>
@@ -910,6 +918,16 @@ export default function WordPressPage() {
                     </Button>
                   )}
                 </div>
+                
+                {/* Important notice about Facebook Business App */}
+                {!socialStatus.facebook?.connected && (
+                  <div className="text-xs text-amber-500 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+                    <strong>Necesar:</strong> Aplicație Facebook de tip Business cu use case "Manage and access Page content". 
+                    <a href="https://developers.facebook.com/apps/create/" target="_blank" rel="noopener noreferrer" className="underline ml-1">
+                      Creează aici
+                    </a>
+                  </div>
+                )}
                 
                 {/* Page Selection Dropdown - shows when pages are pending selection */}
                 {socialStatus.facebook?.pages_pending && socialStatus.facebook?.available_pages?.length > 0 && (
