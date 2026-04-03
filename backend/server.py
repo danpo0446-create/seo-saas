@@ -4172,12 +4172,16 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     redirect_uri = APP_URL + '/api/social/facebook/callback'
     
     # Facebook OAuth URL with page permissions
+    # Using permissions that DON'T require App Review for testing
+    # pages_show_list - see list of pages user manages
+    # pages_read_engagement - read page engagement metrics (optional)
+    # For posting, the Page Access Token is used directly
     auth_url = (
         f"https://www.facebook.com/v19.0/dialog/oauth?"
         f"client_id={fb_app_id}"
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
-        f"&scope=pages_manage_posts,pages_read_engagement,pages_show_list"
+        f"&scope=pages_show_list,pages_read_user_content,public_profile"
     )
     
     return {
@@ -4186,8 +4190,22 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     }
 
 @api_router.get("/social/facebook/callback")
-async def facebook_oauth_callback(code: str = Query(...), state: str = Query(...)):
+async def facebook_oauth_callback(
+    code: Optional[str] = None, 
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_message: Optional[str] = None
+):
     """Handle Facebook OAuth callback"""
+    # Handle Facebook errors
+    if error:
+        error_msg = error_message or error
+        logging.error(f"Facebook OAuth error: {error_msg}")
+        return RedirectResponse(url=f"/wordpress?error={error_msg}")
+    
+    if not code or not state:
+        return RedirectResponse(url=f"/wordpress?error=missing_code_or_state")
+    
     try:
         user_id, site_id = state.split(":")
     except:
