@@ -4172,15 +4172,16 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     redirect_uri = APP_URL + '/api/social/facebook/callback'
     
     # Facebook OAuth URL with page permissions
-    # Using permissions that DON'T require App Review for testing
-    # For dev mode, only public_profile works without adding to app
-    # User must add page permissions in Facebook App Dashboard first
+    # Updated for API v19.0+ - old scopes are deprecated
+    # pages_manage_metadata - read page info
+    # pages_read_engagement - read engagement metrics  
+    # pages_manage_posts - create/manage posts
     auth_url = (
         f"https://www.facebook.com/v19.0/dialog/oauth?"
         f"client_id={fb_app_id}"
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
-        f"&scope=public_profile,email"
+        f"&scope=pages_manage_metadata,pages_read_engagement,pages_manage_posts,public_profile"
     )
     
     return {
