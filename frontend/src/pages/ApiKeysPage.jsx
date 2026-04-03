@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/accordion";
 import { 
   Key, Eye, EyeOff, Save, Check, AlertCircle, ExternalLink,
-  Sparkles, Brain, Mail, Image, HelpCircle, Copy, CheckCircle
+  Sparkles, Brain, Mail, Image, HelpCircle, Copy, CheckCircle,
+  Facebook, Linkedin
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -29,7 +30,11 @@ const ApiKeysPage = () => {
     gemini_key: "",
     resend_key: "",
     sendgrid_key: "",
-    pexels_key: ""
+    pexels_key: "",
+    facebook_app_id: "",
+    facebook_app_secret: "",
+    linkedin_client_id: "",
+    linkedin_client_secret: ""
   });
   const [savingKeys, setSavingKeys] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
@@ -79,7 +84,11 @@ const ApiKeysPage = () => {
         gemini_key: "",
         resend_key: "",
         sendgrid_key: "",
-        pexels_key: ""
+        pexels_key: "",
+        facebook_app_id: "",
+        facebook_app_secret: "",
+        linkedin_client_id: "",
+        linkedin_client_secret: ""
       });
       fetchApiKeys();
     } catch (error) {
@@ -190,6 +199,53 @@ const ApiKeysPage = () => {
       ],
       link: "https://www.pexels.com/api/new/",
       pricing: "GRATUIT - 200 requesturi/ora"
+    },
+    {
+      id: "facebook",
+      name: "Facebook App",
+      key: "facebook_app_id",
+      secondKey: "facebook_app_secret",
+      icon: Facebook,
+      color: "text-blue-600",
+      bgColor: "bg-blue-600/10",
+      description: "Pentru postare automata pe pagini Facebook",
+      instructions: [
+        "Mergi la developers.facebook.com",
+        "Creaza un cont de developer si confirma identitatea",
+        "Click pe 'My Apps' > 'Create App'",
+        "Alege 'Business' ca tip de aplicatie",
+        "Adauga produsul 'Facebook Login'",
+        "Din Settings > Basic, copiaza App ID si App Secret",
+        "In Facebook Login Settings, adauga Redirect URI: https://saas.seamanshelp.com/api/social/facebook/callback"
+      ],
+      link: "https://developers.facebook.com/apps/",
+      pricing: "GRATUIT",
+      hasTwoFields: true,
+      field1Label: "App ID",
+      field2Label: "App Secret"
+    },
+    {
+      id: "linkedin",
+      name: "LinkedIn App",
+      key: "linkedin_client_id",
+      secondKey: "linkedin_client_secret",
+      icon: Linkedin,
+      color: "text-blue-700",
+      bgColor: "bg-blue-700/10",
+      description: "Pentru postare automata pe profilul LinkedIn",
+      instructions: [
+        "Mergi la linkedin.com/developers",
+        "Click pe 'Create App'",
+        "Completeaza detaliile aplicatiei",
+        "In tab-ul 'Auth', adauga Redirect URL: https://saas.seamanshelp.com/api/social/linkedin/callback",
+        "Solicita acces la produsul 'Share on LinkedIn' si 'Sign In with LinkedIn'",
+        "Din tab-ul 'Auth', copiaza Client ID si Client Secret"
+      ],
+      link: "https://www.linkedin.com/developers/apps/new",
+      pricing: "GRATUIT",
+      hasTwoFields: true,
+      field1Label: "Client ID",
+      field2Label: "Client Secret"
     }
   ];
 
@@ -345,43 +401,101 @@ const ApiKeysPage = () => {
                     </div>
                   )}
                   
-                  <div className="space-y-2">
-                    <Label className="text-[#A1A1AA]">Cheie API {config.name}</Label>
-                    <div className="relative">
-                      <Input
-                        type={showKeys[config.key] ? "text" : "password"}
-                        placeholder={`Introdu cheia ${config.name}...`}
-                        value={keyInputs[config.key]}
-                        onChange={(e) => setKeyInputs(prev => ({
-                          ...prev,
-                          [config.key]: e.target.value
-                        }))}
-                        className="bg-[#171717] border-[#262626] text-white pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => toggleShowKey(config.key)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                  {config.hasTwoFields ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-[#A1A1AA]">{config.field1Label}</Label>
+                        <div className="relative">
+                          <Input
+                            type={showKeys[config.key] ? "text" : "password"}
+                            placeholder={`Introdu ${config.field1Label}...`}
+                            value={keyInputs[config.key]}
+                            onChange={(e) => setKeyInputs(prev => ({
+                              ...prev,
+                              [config.key]: e.target.value
+                            }))}
+                            className="bg-[#171717] border-[#262626] text-white pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowKey(config.key)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                          >
+                            {showKeys[config.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[#A1A1AA]">{config.field2Label}</Label>
+                        <div className="relative">
+                          <Input
+                            type={showKeys[config.secondKey] ? "text" : "password"}
+                            placeholder={`Introdu ${config.field2Label}...`}
+                            value={keyInputs[config.secondKey]}
+                            onChange={(e) => setKeyInputs(prev => ({
+                              ...prev,
+                              [config.secondKey]: e.target.value
+                            }))}
+                            className="bg-[#171717] border-[#262626] text-white pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowKey(config.secondKey)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                          >
+                            {showKeys[config.secondKey] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={saveApiKeys}
+                        disabled={savingKeys || !keyInputs[config.key] || !keyInputs[config.secondKey]}
+                        className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
                       >
-                        {showKeys[config.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <Button
-                    onClick={saveApiKeys}
-                    disabled={savingKeys || !keyInputs[config.key]}
-                    className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {savingKeys ? "Se salveaza..." : "Salveaza Cheia"}
-                  </Button>
+                        <Save className="w-4 h-4 mr-2" />
+                        {savingKeys ? "Se salveaza..." : "Salveaza Cheile"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-[#A1A1AA]">Cheie API {config.name}</Label>
+                        <div className="relative">
+                          <Input
+                            type={showKeys[config.key] ? "text" : "password"}
+                            placeholder={`Introdu cheia ${config.name}...`}
+                            value={keyInputs[config.key]}
+                            onChange={(e) => setKeyInputs(prev => ({
+                              ...prev,
+                              [config.key]: e.target.value
+                            }))}
+                            className="bg-[#171717] border-[#262626] text-white pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowKey(config.key)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-white"
+                          >
+                            {showKeys[config.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={saveApiKeys}
+                        disabled={savingKeys || !keyInputs[config.key]}
+                        className="w-full bg-[#00E676] text-black hover:bg-[#00E676]/90"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {savingKeys ? "Se salveaza..." : "Salveaza Cheia"}
+                      </Button>
+                    </>
+                  )}
                   
                   <div className="p-3 rounded-lg bg-[#171717] border border-[#262626]">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5" />
                       <p className="text-[#A1A1AA] text-sm">
-                        Cheile tale sunt criptate si stocate securizat. Nu le partajam cu nimeni.
+                        Cheile tale sunt stocate securizat. Nu le partajam cu nimeni.
                       </p>
                     </div>
                   </div>

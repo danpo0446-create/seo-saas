@@ -47,6 +47,10 @@ class UserApiKeysUpdate(BaseModel):
     resend_key: Optional[str] = None
     sendgrid_key: Optional[str] = None
     pexels_key: Optional[str] = None
+    facebook_app_id: Optional[str] = None
+    facebook_app_secret: Optional[str] = None
+    linkedin_client_id: Optional[str] = None
+    linkedin_client_secret: Optional[str] = None
 
 class UserApiKeysResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -57,6 +61,10 @@ class UserApiKeysResponse(BaseModel):
     has_resend_key: bool = False
     has_sendgrid_key: bool = False
     has_pexels_key: bool = False
+    has_facebook_app_id: bool = False
+    has_facebook_app_secret: bool = False
+    has_linkedin_client_id: bool = False
+    has_linkedin_client_secret: bool = False
     updated_at: Optional[str] = None
 
 # Stripe Models
