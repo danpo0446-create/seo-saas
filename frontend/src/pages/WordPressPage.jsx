@@ -921,11 +921,8 @@ export default function WordPressPage() {
                 
                 {/* Important notice about Facebook Business App */}
                 {!socialStatus.facebook?.connected && (
-                  <div className="text-xs text-amber-500 bg-amber-500/10 p-2 rounded border border-amber-500/20">
-                    <strong>Necesar:</strong> Aplicație Facebook de tip Business cu use case "Manage and access Page content". 
-                    <a href="https://developers.facebook.com/apps/create/" target="_blank" rel="noopener noreferrer" className="underline ml-1">
-                      Creează aici
-                    </a>
+                  <div className="text-xs text-muted-foreground bg-secondary/50 p-2 rounded border border-border">
+                    <strong>Configurare:</strong> Necesită aplicație Facebook cu use case "Manage everything on your Page".
                   </div>
                 )}
                 
