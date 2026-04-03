@@ -7305,10 +7305,30 @@ async def run_site_automation(site_id: str, user_id: str):
         )
         logging.info(f"[SCHEDULER] Site {site_name}: SUCCESS - Generated article '{article['title']}' at {now_romania.strftime('%H:%M')}")
         
+        # Create success notification
+        await create_notification(
+            user_id=user_id,
+            title="Articol generat cu succes",
+            message=f"Articolul '{article['title'][:50]}...' a fost generat și publicat.",
+            notification_type="success",
+            site_id=site_id,
+            site_name=site_name
+        )
+        
         # NOTE: Email notification is now handled INSIDE generate_automated_article_with_settings
         # to avoid duplicate emails. The function checks settings.email_notification internally.
     else:
         logging.error(f"[SCHEDULER] Site {site_name}: FAILED to generate article")
+        
+        # Create failure notification
+        await create_notification(
+            user_id=user_id,
+            title="Eroare generare articol",
+            message=f"Scheduler-ul nu a putut genera articolul programat. Verifică cheile API și setările.",
+            notification_type="error",
+            site_id=site_id,
+            site_name=site_name
+        )
 
 async def generate_automated_article_with_settings(site: dict, user_id: str, settings: dict):
     """Generate an article with site-specific settings including product links
@@ -7549,6 +7569,87 @@ Continuă:"""
     
     logging.info(f"[AUTOMATION] Site {site_name}: Completed - Article '{title}' (published: {publish_success})")
     return article_doc
+
+# ============ NOTIFICATIONS ============
+
+class NotificationCreate(BaseModel):
+    title: str
+    message: str
+    type: str = "info"  # error, warning, success, info, scheduler
+    site_id: Optional[str] = None
+    site_name: Optional[str] = None
+
+async def create_notification(user_id: str, title: str, message: str, notification_type: str = "info", site_id: str = None, site_name: str = None):
+    """Helper function to create a notification for a user"""
+    notification = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "title": title,
+        "message": message,
+        "type": notification_type,
+        "site_id": site_id,
+        "site_name": site_name,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    logging.info(f"[NOTIFICATION] Created {notification_type} notification for user {user_id}: {title}")
+    return notification
+
+@api_router.get("/notifications")
+async def get_notifications(user: dict = Depends(get_current_user)):
+    """Get all notifications for the current user"""
+    notifications = await db.notifications.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    unread_count = await db.notifications.count_documents({
+        "user_id": user["id"],
+        "read": False
+    })
+    
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count
+    }
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
+    """Mark a single notification as read"""
+    result = await db.notifications.update_one(
+        {"id": notification_id, "user_id": user["id"]},
+        {"$set": {"read": True}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"success": True}
+
+@api_router.put("/notifications/read-all")
+async def mark_all_notifications_read(user: dict = Depends(get_current_user)):
+    """Mark all notifications as read for the current user"""
+    result = await db.notifications.update_many(
+        {"user_id": user["id"], "read": False},
+        {"$set": {"read": True}}
+    )
+    return {"success": True, "updated_count": result.modified_count}
+
+@api_router.delete("/notifications/{notification_id}")
+async def delete_notification(notification_id: str, user: dict = Depends(get_current_user)):
+    """Delete a single notification"""
+    result = await db.notifications.delete_one({
+        "id": notification_id,
+        "user_id": user["id"]
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"success": True}
+
+@api_router.delete("/notifications/clear-all")
+async def clear_all_notifications(user: dict = Depends(get_current_user)):
+    """Delete all notifications for the current user"""
+    result = await db.notifications.delete_many({"user_id": user["id"]})
+    return {"success": True, "deleted_count": result.deleted_count}
 
 # ============ DASHBOARD STATS ============
 
@@ -8225,11 +8326,31 @@ async def recover_missed_automation_jobs():
             # This job was missed! Run it now
             logging.info(f"[RECOVERY] Site {site_name}: Missed job at {scheduled_hour}:00, running now...")
             
+            # Create notification about recovered job
+            await create_notification(
+                user_id=user_id,
+                title="Job recuperat",
+                message=f"Job-ul programat la ora {scheduled_hour}:00 a fost ratat și este rulat acum.",
+                notification_type="scheduler",
+                site_id=site_id,
+                site_name=site_name
+            )
+            
             try:
                 await run_site_automation(site_id, user_id)
                 logging.info(f"[RECOVERY] Site {site_name}: Successfully recovered missed job!")
             except Exception as job_err:
                 logging.error(f"[RECOVERY] Site {site_name}: Error recovering job: {job_err}")
+                
+                # Create error notification
+                await create_notification(
+                    user_id=user_id,
+                    title="Eroare la recuperare job",
+                    message=f"Nu s-a putut recupera job-ul ratat: {str(job_err)[:100]}",
+                    notification_type="error",
+                    site_id=site_id,
+                    site_name=site_name
+                )
         
         logging.info("[RECOVERY] Finished checking for missed jobs")
         

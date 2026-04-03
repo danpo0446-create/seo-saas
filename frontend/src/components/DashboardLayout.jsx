@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSite } from '@/contexts/SiteContext';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { NotificationCenter } from '@/components/NotificationCenter';
 import {
   Select,
   SelectContent,
@@ -249,6 +250,9 @@ export const DashboardLayout = () => {
             )}
             
             <div className="ml-auto flex items-center gap-4">
+              {/* Notification Center */}
+              <NotificationCenter />
+              
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                 <span className="text-muted-foreground">Status:</span>

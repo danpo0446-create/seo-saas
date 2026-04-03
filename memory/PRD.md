@@ -54,6 +54,15 @@ Collections:
 
 ### Date: 2026-04-03 (Latest)
 
+#### Notification Center ✅
+- **NEW** Componentă `NotificationCenter.jsx` - dropdown cu notificări în header
+- **NEW** Endpoint-uri: GET/PUT/DELETE `/api/notifications/*`
+- **NEW** Notificări automate pentru: succes generare articol, erori scheduler, job-uri recuperate
+- **NEW** Tipuri de notificări: success (verde), error (roșu), warning (galben), info (albastru), scheduler (violet)
+- **NEW** Badge cu număr notificări necitite în header
+- **NEW** Funcționalități: mark as read, mark all as read, delete, clear all
+- Collection MongoDB: `notifications`
+
 #### Facebook Page Selection UI ✅
 - **NEW** Dropdown selector în modal-ul social pentru alegerea paginii Facebook
 - **NEW** State-uri pentru `selectedFacebookPage` și `savingFacebookPage` în WordPressPage.jsx
@@ -174,6 +183,13 @@ Collections:
 - `PUT /api/saas/api-keys` - Update BYOAK keys
 - `GET /api/saas/invoices` - List invoices
 - `GET /api/saas/invoices/{id}/pdf` - Download invoice PDF
+
+### Notification Endpoints
+- `GET /api/notifications` - Get all notifications with unread count
+- `PUT /api/notifications/{id}/read` - Mark notification as read
+- `PUT /api/notifications/read-all` - Mark all as read
+- `DELETE /api/notifications/{id}` - Delete single notification
+- `DELETE /api/notifications/clear-all` - Clear all notifications
 
 ### Social Media Endpoints
 - `GET /api/social/status/{site_id}` - Get Facebook/LinkedIn connection status + available_pages
