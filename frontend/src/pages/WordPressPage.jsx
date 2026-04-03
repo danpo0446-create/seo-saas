@@ -917,11 +917,11 @@ export default function WordPressPage() {
                     <div>
                       <h4 className="font-medium">Facebook Page</h4>
                       <p className="text-xs text-muted-foreground">
-                        {socialStatus.facebook?.page_name || 'Postare automată pe pagina Facebook'}
+                        {socialStatus.facebook?.page_name || socialStatus.facebook?.page_id || 'Postare automată pe pagina Facebook'}
                       </p>
                     </div>
                   </div>
-                  {socialStatus.facebook?.connected ? (
+                  {socialStatus.facebook?.connected && (
                     <div className="flex items-center gap-2">
                       <Badge className="bg-green-500/10 text-green-500">Conectat</Badge>
                       <Button
@@ -943,67 +943,59 @@ export default function WordPressPage() {
                         Deconectează
                       </Button>
                     </div>
-                  ) : (
-                    <Button
-                      onClick={() => connectFacebook(socialModal.id)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white"
-                      data-testid="connect-facebook-btn"
-                    >
-                      Conectează
-                    </Button>
                   )}
                 </div>
                 
                 {/* Important notice about Facebook Business App */}
                 {!socialStatus.facebook?.connected && (
-                  <div className="text-xs text-muted-foreground bg-secondary/50 p-2 rounded border border-border space-y-2">
-                    <p><strong>Configurare:</strong> Necesită aplicație Facebook cu use case "Manage everything on your Page".</p>
-                    <p className="text-amber-500">Dacă conexiunea nu funcționează, poți introduce manual Page ID-ul de pe Facebook.</p>
-                  </div>
-                )}
-                
-                {/* Manual Page ID Entry - fallback when OAuth doesn't return pages */}
-                {!socialStatus.facebook?.connected && (
                   <div className="mt-3 p-3 rounded-lg bg-secondary/50 border border-border">
-                    <p className="text-sm font-medium mb-2">Conectare manuală (alternativ):</p>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Facebook Page ID (ex: 123456789)"
-                        value={manualPageId || ''}
-                        onChange={(e) => setManualPageId(e.target.value)}
-                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                        data-testid="manual-page-id-input"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Page Access Token (din Graph API Explorer)"
-                        value={manualPageToken || ''}
-                        onChange={(e) => setManualPageToken(e.target.value)}
-                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                        data-testid="manual-page-token-input"
-                      />
+                    <p className="text-sm font-medium mb-3">Conectare Facebook Page:</p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-1">Page ID</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 112431577304128"
+                          value={manualPageId || ''}
+                          onChange={(e) => setManualPageId(e.target.value)}
+                          className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                          data-testid="manual-page-id-input"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Facebook → Pagina ta → About → Page ID</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-1">Page Access Token</label>
+                        <input
+                          type="text"
+                          placeholder="Token generat din Graph API Explorer"
+                          value={manualPageToken || ''}
+                          onChange={(e) => setManualPageToken(e.target.value)}
+                          className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                          data-testid="manual-page-token-input"
+                        />
+                        <a 
+                          href="https://developers.facebook.com/tools/explorer/" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-xs text-blue-500 underline"
+                        >
+                          Generează token aici →
+                        </a>
+                      </div>
                       <Button
                         onClick={() => saveManualPageId(socialModal.id, manualPageId, manualPageToken)}
                         disabled={!manualPageId || !manualPageToken || savingFacebookPage}
-                        variant="outline"
-                        className="w-full border-blue-500/30 text-blue-500"
+                        className="w-full bg-blue-500 hover:bg-blue-600 text-white"
                         data-testid="save-manual-page-btn"
                       >
                         {savingFacebookPage ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         ) : (
-                          'Salvează'
+                          <Save className="w-4 h-4 mr-2" />
                         )}
+                        Salvează
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      1. Mergi la <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Graph API Explorer</a><br/>
-                      2. Selectează aplicația ta și pagina<br/>
-                      3. Adaugă permisiunile: pages_manage_posts, pages_read_engagement<br/>
-                      4. Click "Generate Access Token"<br/>
-                      5. Copiază token-ul aici
-                    </p>
                   </div>
                 )}
                 

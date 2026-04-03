@@ -202,31 +202,24 @@ const ApiKeysPage = () => {
     },
     {
       id: "facebook",
-      name: "Facebook App",
-      key: "facebook_app_id",
-      secondKey: "facebook_app_secret",
+      name: "Facebook Page Token",
+      key: "facebook_page_token_info",
       icon: Facebook,
       color: "text-blue-600",
       bgColor: "bg-blue-600/10",
       description: "Pentru postare automata pe pagini Facebook",
       instructions: [
-        "1. Mergi la developers.facebook.com/apps/create/",
-        "2. Selecteaza 'Manage everything on your Page' din lista",
-        "3. Click Next, pune un nume aplicatiei (ex: SEO Automation)",
-        "4. Selecteaza Business Portfolio sau creaza unul nou",
-        "5. Dupa creare, mergi la App Settings > Basic",
-        "6. Copiaza App ID si App Secret",
-        "7. La 'App Domains' adauga domeniul tau (ex: saas.seamanshelp.com)",
-        "8. Mergi la Use Cases > Customize > Facebook Login > Settings",
-        "9. La 'Valid OAuth Redirect URIs' adauga: https://DOMENIUL_TAU/api/social/facebook/callback",
-        "10. Pentru Live: Click pe 'Publica' din meniul stanga sau App Settings > Basic > App Mode",
-        "11. NOTA: In Development mode, doar tu (admin) poti testa. Pentru alti useri, pune Live."
+        "1. Mergi la developers.facebook.com/tools/explorer/",
+        "2. La 'Meta App' selecteaza aplicatia ta sau creeaza una noua",
+        "3. La 'User or Page' selecteaza pagina Facebook dorita",
+        "4. Adauga permisiunile: pages_manage_posts, pages_read_engagement",
+        "5. Click 'Generate Access Token'",
+        "6. Copiaza token-ul",
+        "7. In platforma, la Site-uri WordPress > Social, pune Page ID si Token"
       ],
-      link: "https://developers.facebook.com/apps/create/",
+      link: "https://developers.facebook.com/tools/explorer/",
       pricing: "GRATUIT",
-      hasTwoFields: true,
-      field1Label: "App ID",
-      field2Label: "App Secret"
+      infoOnly: true
     },
     {
       id: "linkedin",
