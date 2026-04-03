@@ -1712,6 +1712,16 @@ async def prepare_backlink_outreach(
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         
+        # Get user info for signature
+        user_doc = await db.users.find_one({"id": user["id"]}, {"_id": 0, "name": 1, "email": 1})
+        user_name = user_doc.get("name", "Administrator") if user_doc else "Administrator"
+        
+        # Site contact info - use site settings or defaults
+        site_email = wp_site.get("contact_email", "martechassistance@gmail.com")
+        site_website = wp_site.get("site_url", "https://martechassistance.com")
+        site_phone = wp_site.get("contact_phone", "0721578660")
+        site_name = wp_site.get("site_name", "Martech Assistance")
+        
         # Detect target site language based on domain
         target_domain = backlink['domain'].lower()
         if target_domain.endswith('.ro'):
@@ -1738,13 +1748,22 @@ async def prepare_backlink_outreach(
                 Target website type: {backlink.get('type', 'General')}
                 Contact email: {backlink.get('contact_info', 'N/A')}
                 
-                My website: {wp_site.get('site_url')}
+                My website: {site_website}
                 My niche: {wp_site.get('niche', 'General')}
+                My company: {site_name}
                 
                 Article to promote (written in Romanian):
                 - Title: {best_article['title']}
-                - URL: {best_article.get('wordpress_url', wp_site.get('site_url'))}
+                - URL: {best_article.get('wordpress_url', site_website)}
                 - Keywords: {best_article.get('keywords', 'N/A')}
+                
+                SIGNATURE INFO (MUST include at the end):
+                - Name: {user_name}
+                - Position: Administrator
+                - Company: {site_name}
+                - Email: {site_email}
+                - Website: {site_website}
+                - Phone: {site_phone}
                 
                 CRITICAL INSTRUCTIONS:
                 1. Write the ENTIRE email in {target_language}
@@ -1753,9 +1772,10 @@ async def prepare_backlink_outreach(
                 4. Has a catchy subject line in {target_language}
                 5. Introduces yourself briefly
                 6. Mentions why your article would be valuable for their readers
-                7. Includes the article link naturally
+                7. Includes the article link naturally (ONLY ONCE, do not duplicate)
                 8. Has a clear call to action
                 9. Is polite and not pushy
+                10. MUST include full signature with name, company, email, website and phone at the end
                 
                 Format the response as JSON:
                 {{"subject": "...", "body": "...", "language": "{target_language}"}}
@@ -1783,11 +1803,18 @@ I came across your website {backlink['domain']} and I think our content could be
 
 I recently published an article titled "{best_article['title']}" that covers topics relevant to your readers.
 
-You can check it out here: {best_article.get('wordpress_url', wp_site.get('site_url'))}
+You can check it out here: {best_article.get('wordpress_url', site_website)}
 
 Would you be interested in featuring it or collaborating in some way?
 
-Best regards"""
+Best regards,
+
+{user_name}
+Administrator
+{site_name}
+Email: {site_email}
+Website: {site_website}
+Phone: {site_phone}"""
         }
     
     # Save the outreach draft
