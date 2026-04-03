@@ -380,7 +380,11 @@ async def update_api_keys(keys: UserApiKeysUpdate, user: dict = Depends(get_curr
         gemini_key=keys.gemini_key,
         resend_key=keys.resend_key,
         sendgrid_key=keys.sendgrid_key,
-        pexels_key=keys.pexels_key
+        pexels_key=keys.pexels_key,
+        facebook_app_id=keys.facebook_app_id,
+        facebook_app_secret=keys.facebook_app_secret,
+        linkedin_client_id=keys.linkedin_client_id,
+        linkedin_client_secret=keys.linkedin_client_secret
     )
 
 @saas_router.post("/api-keys/validate")

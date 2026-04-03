@@ -199,6 +199,10 @@ class ApiKeyService:
                 "has_resend_key": False,
                 "has_sendgrid_key": False,
                 "has_pexels_key": False,
+                "has_facebook_app_id": False,
+                "has_facebook_app_secret": False,
+                "has_linkedin_client_id": False,
+                "has_linkedin_client_secret": False,
                 "updated_at": None
             }
         
@@ -210,11 +214,17 @@ class ApiKeyService:
             "has_resend_key": bool(keys.get("resend_key")),
             "has_sendgrid_key": bool(keys.get("sendgrid_key")),
             "has_pexels_key": bool(keys.get("pexels_key")),
+            "has_facebook_app_id": bool(keys.get("facebook_app_id")),
+            "has_facebook_app_secret": bool(keys.get("facebook_app_secret")),
+            "has_linkedin_client_id": bool(keys.get("linkedin_client_id")),
+            "has_linkedin_client_secret": bool(keys.get("linkedin_client_secret")),
             "updated_at": keys.get("updated_at")
         }
     
     async def update_keys(self, user_id: str, openai_key: str = None, gemini_key: str = None,
-                          resend_key: str = None, sendgrid_key: str = None, pexels_key: str = None) -> Dict[str, Any]:
+                          resend_key: str = None, sendgrid_key: str = None, pexels_key: str = None,
+                          facebook_app_id: str = None, facebook_app_secret: str = None,
+                          linkedin_client_id: str = None, linkedin_client_secret: str = None) -> Dict[str, Any]:
         """Update user's API keys"""
         existing = await self.db.user_api_keys.find_one({"user_id": user_id})
         
@@ -230,6 +240,14 @@ class ApiKeyService:
             update_data["sendgrid_key"] = encrypt_api_key(sendgrid_key) if sendgrid_key else ""
         if pexels_key is not None:
             update_data["pexels_key"] = encrypt_api_key(pexels_key) if pexels_key else ""
+        if facebook_app_id is not None:
+            update_data["facebook_app_id"] = encrypt_api_key(facebook_app_id) if facebook_app_id else ""
+        if facebook_app_secret is not None:
+            update_data["facebook_app_secret"] = encrypt_api_key(facebook_app_secret) if facebook_app_secret else ""
+        if linkedin_client_id is not None:
+            update_data["linkedin_client_id"] = encrypt_api_key(linkedin_client_id) if linkedin_client_id else ""
+        if linkedin_client_secret is not None:
+            update_data["linkedin_client_secret"] = encrypt_api_key(linkedin_client_secret) if linkedin_client_secret else ""
         
         if existing:
             await self.db.user_api_keys.update_one(
