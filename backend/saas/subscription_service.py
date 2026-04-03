@@ -19,21 +19,25 @@ def get_encryption_key() -> bytes:
     key = hashlib.sha256(secret.encode()).digest()
     return base64.urlsafe_b64encode(key)
 
-fernet = Fernet(get_encryption_key())
+def get_fernet():
+    """Get Fernet instance - created on demand to ensure env vars are loaded"""
+    return Fernet(get_encryption_key())
 
 def encrypt_api_key(key: str) -> str:
     """Encrypt an API key for storage"""
     if not key:
         return ""
-    return fernet.encrypt(key.encode()).decode()
+    return get_fernet().encrypt(key.encode()).decode()
 
 def decrypt_api_key(encrypted_key: str) -> str:
     """Decrypt an API key"""
     if not encrypted_key:
         return ""
     try:
-        return fernet.decrypt(encrypted_key.encode()).decode()
-    except Exception:
+        return get_fernet().decrypt(encrypted_key.encode()).decode()
+    except Exception as e:
+        import logging
+        logging.error(f"[DECRYPT] Failed to decrypt key: {e}")
         return ""
 
 class SubscriptionService:
