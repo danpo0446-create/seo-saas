@@ -4508,6 +4508,52 @@ async def test_facebook_post(site_id: str, user: dict = Depends(get_current_user
             "error": str(e)
         }
 
+
+@api_router.post("/social/linkedin/test-post/{site_id}")
+async def test_linkedin_post(site_id: str, user: dict = Depends(get_current_user)):
+    """Test LinkedIn posting for a site"""
+    from services.social_posting import post_to_linkedin
+    
+    site = await db.wordpress_configs.find_one(
+        {"id": site_id, "user_id": user["id"]},
+        {"_id": 0}
+    )
+    
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    linkedin_token = site.get("linkedin_access_token")
+    linkedin_person_id = site.get("linkedin_person_id")
+    
+    if not linkedin_token or not linkedin_person_id:
+        return {
+            "success": False,
+            "error": "LinkedIn nu este conectat. Conectează-l mai întâi."
+        }
+    
+    # Try a test post
+    try:
+        result = await post_to_linkedin(
+            access_token=linkedin_token,
+            person_id=linkedin_person_id,
+            text="🔧 Test de postare automată SEO Automation\n\nAcesta este un test pentru verificarea conexiunii LinkedIn. Va fi șters.",
+            article_url=site.get("site_url", "https://example.com"),
+            article_title="Test Conexiune",
+            article_description="Verificare conexiune LinkedIn"
+        )
+        
+        return {
+            "success": result.get("success", False),
+            "post_id": result.get("post_id"),
+            "error": result.get("error")
+        }
+    except Exception as e:
+        logging.error(f"[LINKEDIN_TEST] Exception: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 @api_router.delete("/social/linkedin/disconnect/{site_id}")
 async def disconnect_linkedin(site_id: str, user: dict = Depends(get_current_user)):
     """Disconnect LinkedIn from a site"""

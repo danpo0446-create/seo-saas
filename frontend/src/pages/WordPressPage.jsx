@@ -307,6 +307,22 @@ export default function WordPressPage() {
     }
   };
 
+  const testLinkedInPost = async (siteId) => {
+    try {
+      toast.info('Se testează postarea pe LinkedIn...');
+      const response = await axios.post(`${API}/social/linkedin/test-post/${siteId}`, {}, {
+        headers: getAuthHeaders()
+      });
+      if (response.data.success) {
+        toast.success(`✅ Test LinkedIn reușit!`);
+      } else {
+        toast.error(`❌ Eroare: ${response.data.error}`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Eroare la testare LinkedIn');
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -863,50 +879,50 @@ export default function WordPressPage() {
                 </div>
               </div>
 
-              {/* LinkedIn - only for seamanshelp */}
-              {socialStatus.linkedin?.available && (
-                <div className="p-4 rounded-lg border border-border bg-secondary/30">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-700/10">
-                        <Linkedin className="w-5 h-5 text-blue-700" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">LinkedIn (Profil Personal)</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {socialStatus.linkedin?.person_name || 'Postări pe profilul tău personal'}
-                        </p>
-                      </div>
+              {/* LinkedIn */}
+              <div className="p-4 rounded-lg border border-border bg-secondary/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-700/10">
+                      <Linkedin className="w-5 h-5 text-blue-700" />
                     </div>
-                    {socialStatus.linkedin?.connected ? (
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-green-500/10 text-green-500">Conectat</Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => disconnectLinkedIn(socialModal.id)}
-                          className="text-red-500 border-red-500/30"
-                        >
-                          Deconectează
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={() => connectLinkedIn(socialModal.id)}
-                        className="bg-blue-700 hover:bg-blue-800 text-white"
-                      >
-                        Conectează
-                      </Button>
-                    )}
+                    <div>
+                      <h4 className="font-medium">LinkedIn (Profil Personal)</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {socialStatus.linkedin?.person_name || 'Postări pe profilul tău personal'}
+                      </p>
+                    </div>
                   </div>
+                  {socialStatus.linkedin?.connected ? (
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-500/10 text-green-500">Conectat</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => testLinkedInPost(socialModal.id)}
+                        className="text-blue-700 border-blue-700/30"
+                      >
+                        Test
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => disconnectLinkedIn(socialModal.id)}
+                        className="text-red-500 border-red-500/30"
+                      >
+                        Deconectează
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => connectLinkedIn(socialModal.id)}
+                      className="bg-blue-700 hover:bg-blue-800 text-white"
+                    >
+                      Conectează
+                    </Button>
+                  )}
                 </div>
-              )}
-
-              {!socialStatus.linkedin?.available && (
-                <p className="text-xs text-center text-muted-foreground">
-                  LinkedIn este disponibil doar pentru seamanshelp.com
-                </p>
-              )}
+              </div>
             </CardContent>
             <div className="border-t border-border p-4 flex justify-end">
               <Button variant="outline" onClick={() => setSocialModal(null)}>
