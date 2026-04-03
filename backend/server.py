@@ -273,7 +273,15 @@ async def send_job_failure_alert(job_name: str, error_message: str, site_name: s
         logging.error(f"[ALERT] Failed to send job failure alert: {e}")
 
 # Scheduler for automated tasks - using Romania timezone
-scheduler = AsyncIOScheduler(timezone=ROMANIA_TZ)
+# Added misfire_grace_time to handle missed jobs when server was down
+scheduler = AsyncIOScheduler(
+    timezone=ROMANIA_TZ,
+    job_defaults={
+        'coalesce': True,  # If multiple runs were missed, run only once
+        'misfire_grace_time': 7200,  # 2 hours grace period for missed jobs
+        'max_instances': 1  # Only one instance of each job at a time
+    }
+)
 
 # Create the main app
 app = FastAPI(title="SEO Automation Platform")
@@ -7906,6 +7914,15 @@ async def startup_event():
         replace_existing=True
     )
     logging.info("Scheduled monthly usage reset")
+    
+    # Schedule daily missed job recovery at 10:30 AM (after most jobs should have run)
+    scheduler.add_job(
+        recover_missed_automation_jobs,
+        CronTrigger(hour=10, minute=30, timezone=ROMANIA_TZ),
+        id="daily_job_recovery",
+        replace_existing=True
+    )
+    logging.info("Scheduled daily missed job recovery at 10:30 AM")
 
 async def reset_monthly_usage():
     """Reset monthly article usage for all subscriptions on 1st of month"""

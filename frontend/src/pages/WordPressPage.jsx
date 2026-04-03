@@ -45,6 +45,8 @@ export default function WordPressPage() {
   const [newKeyword, setNewKeyword] = useState('');
   const [socialModal, setSocialModal] = useState(null);
   const [socialStatus, setSocialStatus] = useState({});
+  const [selectedFacebookPage, setSelectedFacebookPage] = useState('');
+  const [savingFacebookPage, setSavingFacebookPage] = useState(false);
   const [formData, setFormData] = useState({
     site_url: '',
     site_name: '',
@@ -320,6 +322,34 @@ export default function WordPressPage() {
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Eroare la testare LinkedIn');
+    }
+  };
+
+  const selectFacebookPage = async (siteId, pageId) => {
+    if (!pageId) {
+      toast.error('Selectează o pagină Facebook');
+      return;
+    }
+    setSavingFacebookPage(true);
+    try {
+      const response = await axios.post(
+        `${API}/social/facebook/select-page/${siteId}?page_id=${pageId}`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      if (response.data.success) {
+        toast.success(`Pagină selectată: ${response.data.page_name}`);
+        // Refresh social status
+        const statusResponse = await axios.get(`${API}/social/status/${siteId}`, { 
+          headers: getAuthHeaders() 
+        });
+        setSocialStatus(statusResponse.data);
+        setSelectedFacebookPage('');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Eroare la selectarea paginii');
+    } finally {
+      setSavingFacebookPage(false);
     }
   };
 
@@ -835,7 +865,7 @@ export default function WordPressPage() {
               </p>
 
               {/* Facebook */}
-              <div className="p-4 rounded-lg border border-border bg-secondary/30">
+              <div className="p-4 rounded-lg border border-border bg-secondary/30 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-blue-500/10">
@@ -856,6 +886,7 @@ export default function WordPressPage() {
                         size="sm"
                         onClick={() => testFacebookPost(socialModal.id)}
                         className="border-blue-500/30 text-blue-500"
+                        data-testid="test-facebook-post-btn"
                       >
                         Test Post
                       </Button>
@@ -864,6 +895,7 @@ export default function WordPressPage() {
                         size="sm"
                         onClick={() => disconnectFacebook(socialModal.id)}
                         className="text-red-500 border-red-500/30"
+                        data-testid="disconnect-facebook-btn"
                       >
                         Deconectează
                       </Button>
@@ -872,11 +904,55 @@ export default function WordPressPage() {
                     <Button
                       onClick={() => connectFacebook(socialModal.id)}
                       className="bg-blue-500 hover:bg-blue-600 text-white"
+                      data-testid="connect-facebook-btn"
                     >
                       Conectează
                     </Button>
                   )}
                 </div>
+                
+                {/* Page Selection Dropdown - shows when pages are pending selection */}
+                {socialStatus.facebook?.pages_pending && socialStatus.facebook?.available_pages?.length > 0 && (
+                  <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                    <p className="text-sm text-amber-600 dark:text-amber-400 mb-2">
+                      <strong>Selectează pagina Facebook:</strong>
+                    </p>
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedFacebookPage}
+                        onChange={(e) => setSelectedFacebookPage(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm"
+                        data-testid="facebook-page-select"
+                      >
+                        <option value="">-- Selectează o pagină --</option>
+                        {socialStatus.facebook.available_pages.map((page) => (
+                          <option key={page.id} value={page.id}>
+                            {page.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        onClick={() => selectFacebookPage(socialModal.id, selectedFacebookPage)}
+                        disabled={!selectedFacebookPage || savingFacebookPage}
+                        className="bg-blue-500 hover:bg-blue-600 text-white"
+                        data-testid="save-facebook-page-btn"
+                      >
+                        {savingFacebookPage ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show available pages even when connected, for reference */}
+                {socialStatus.facebook?.connected && socialStatus.facebook?.available_pages?.length > 1 && !socialStatus.facebook?.pages_pending && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Alte pagini disponibile: {socialStatus.facebook.available_pages.filter(p => p.id !== socialStatus.facebook.page_id).map(p => p.name).join(', ')}
+                  </div>
+                )}
               </div>
 
               {/* LinkedIn */}
@@ -901,6 +977,7 @@ export default function WordPressPage() {
                         size="sm"
                         onClick={() => testLinkedInPost(socialModal.id)}
                         className="text-blue-700 border-blue-700/30"
+                        data-testid="test-linkedin-post-btn"
                       >
                         Test
                       </Button>
@@ -909,6 +986,7 @@ export default function WordPressPage() {
                         size="sm"
                         onClick={() => disconnectLinkedIn(socialModal.id)}
                         className="text-red-500 border-red-500/30"
+                        data-testid="disconnect-linkedin-btn"
                       >
                         Deconectează
                       </Button>
@@ -917,6 +995,7 @@ export default function WordPressPage() {
                     <Button
                       onClick={() => connectLinkedIn(socialModal.id)}
                       className="bg-blue-700 hover:bg-blue-800 text-white"
+                      data-testid="connect-linkedin-btn"
                     >
                       Conectează
                     </Button>
