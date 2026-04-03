@@ -4173,13 +4173,13 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     
     # Facebook OAuth URL
     # Requires Business app with "Manage everything on your Page" use case
-    # Permissions: pages_manage_posts, pages_read_engagement, pages_manage_metadata
+    # pages_show_list forces Facebook to show page selection dialog
     auth_url = (
         f"https://www.facebook.com/v19.0/dialog/oauth?"
         f"client_id={fb_app_id}"
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
-        f"&scope=pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content"
+        f"&scope=pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content"
     )
     
     return {
