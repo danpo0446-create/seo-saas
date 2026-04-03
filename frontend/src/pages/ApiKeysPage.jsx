@@ -216,10 +216,11 @@ const ApiKeysPage = () => {
         "4. Selecteaza Business Portfolio sau creaza unul nou",
         "5. Dupa creare, mergi la App Settings > Basic",
         "6. Copiaza App ID si App Secret",
-        "7. La 'App Domains' adauga: saas.seamanshelp.com",
-        "8. La Facebook Login > Settings > Valid OAuth Redirect URIs adauga:",
-        "   https://saas.seamanshelp.com/api/social/facebook/callback",
-        "9. Pune aplicatia in modul Live (toggle sus-dreapta)"
+        "7. La 'App Domains' adauga domeniul tau (ex: saas.seamanshelp.com)",
+        "8. Mergi la Use Cases > Customize > Facebook Login > Settings",
+        "9. La 'Valid OAuth Redirect URIs' adauga: https://DOMENIUL_TAU/api/social/facebook/callback",
+        "10. Pentru Live: Click pe 'Publica' din meniul stanga sau App Settings > Basic > App Mode",
+        "11. NOTA: In Development mode, doar tu (admin) poti testa. Pentru alti useri, pune Live."
       ],
       link: "https://developers.facebook.com/apps/create/",
       pricing: "GRATUIT",
