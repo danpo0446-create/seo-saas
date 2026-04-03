@@ -48,6 +48,7 @@ export default function WordPressPage() {
   const [selectedFacebookPage, setSelectedFacebookPage] = useState('');
   const [savingFacebookPage, setSavingFacebookPage] = useState(false);
   const [manualPageId, setManualPageId] = useState('');
+  const [manualPageToken, setManualPageToken] = useState('');
   const [formData, setFormData] = useState({
     site_url: '',
     site_name: '',
@@ -362,21 +363,26 @@ export default function WordPressPage() {
     }
   };
 
-  const saveManualPageId = async (siteId, pageId) => {
+  const saveManualPageId = async (siteId, pageId, pageToken) => {
     if (!pageId || !pageId.trim()) {
       toast.error('Introdu un Page ID valid');
+      return;
+    }
+    if (!pageToken || !pageToken.trim()) {
+      toast.error('Introdu un Page Access Token valid');
       return;
     }
     setSavingFacebookPage(true);
     try {
       const response = await axios.post(
         `${API}/social/facebook/manual-connect/${siteId}`,
-        { page_id: pageId.trim() },
+        { page_id: pageId.trim(), page_token: pageToken.trim() },
         { headers: getAuthHeaders() }
       );
       if (response.data.success) {
-        toast.success('Pagina Facebook conectată manual!');
+        toast.success('Pagina Facebook conectată!');
         setManualPageId('');
+        setManualPageToken('');
         // Refresh social status
         const statusResponse = await axios.get(`${API}/social/status/${siteId}`, { 
           headers: getAuthHeaders() 
@@ -960,20 +966,28 @@ export default function WordPressPage() {
                 {!socialStatus.facebook?.connected && (
                   <div className="mt-3 p-3 rounded-lg bg-secondary/50 border border-border">
                     <p className="text-sm font-medium mb-2">Conectare manuală (alternativ):</p>
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                       <input
                         type="text"
                         placeholder="Facebook Page ID (ex: 123456789)"
                         value={manualPageId || ''}
                         onChange={(e) => setManualPageId(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm"
+                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
                         data-testid="manual-page-id-input"
                       />
+                      <input
+                        type="text"
+                        placeholder="Page Access Token (din Graph API Explorer)"
+                        value={manualPageToken || ''}
+                        onChange={(e) => setManualPageToken(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                        data-testid="manual-page-token-input"
+                      />
                       <Button
-                        onClick={() => saveManualPageId(socialModal.id, manualPageId)}
-                        disabled={!manualPageId || savingFacebookPage}
+                        onClick={() => saveManualPageId(socialModal.id, manualPageId, manualPageToken)}
+                        disabled={!manualPageId || !manualPageToken || savingFacebookPage}
                         variant="outline"
-                        className="border-blue-500/30 text-blue-500"
+                        className="w-full border-blue-500/30 text-blue-500"
                         data-testid="save-manual-page-btn"
                       >
                         {savingFacebookPage ? (
@@ -984,7 +998,11 @@ export default function WordPressPage() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Găsești Page ID în: Facebook → Pagina ta → About → Page ID
+                      1. Mergi la <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Graph API Explorer</a><br/>
+                      2. Selectează aplicația ta și pagina<br/>
+                      3. Adaugă permisiunile: pages_manage_posts, pages_read_engagement<br/>
+                      4. Click "Generate Access Token"<br/>
+                      5. Copiază token-ul aici
                     </p>
                   </div>
                 )}

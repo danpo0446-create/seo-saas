@@ -4392,10 +4392,11 @@ async def select_facebook_page(site_id: str, page_id: str, user: dict = Depends(
 
 class ManualPageConnect(BaseModel):
     page_id: str
+    page_token: str = None
 
 @api_router.post("/social/facebook/manual-connect/{site_id}")
 async def manual_connect_facebook_page(site_id: str, data: ManualPageConnect, user: dict = Depends(get_current_user)):
-    """Manually connect a Facebook page by Page ID (fallback when OAuth doesn't return pages)"""
+    """Manually connect a Facebook page by Page ID and Token"""
     site = await db.wordpress_configs.find_one(
         {"id": site_id, "user_id": user["id"]},
         {"_id": 0}
@@ -4404,23 +4405,25 @@ async def manual_connect_facebook_page(site_id: str, data: ManualPageConnect, us
         raise HTTPException(status_code=404, detail="Site not found")
     
     page_id = data.page_id.strip()
+    page_token = data.page_token.strip() if data.page_token else None
     
-    # Try to get page info from Facebook (optional - just for the name)
-    # We'll store the page_id and mark as connected, posting will need a page token
-    # which can be obtained through the app's page access
+    update_data = {
+        "facebook_page_id": page_id,
+        "facebook_page_name": f"Page {page_id}",
+        "facebook_connected": True,
+        "facebook_manual_connect": True,
+        "facebook_connected_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if page_token:
+        update_data["facebook_page_token"] = page_token
     
     await db.wordpress_configs.update_one(
         {"id": site_id, "user_id": user["id"]},
-        {"$set": {
-            "facebook_page_id": page_id,
-            "facebook_page_name": f"Page {page_id}",
-            "facebook_connected": True,
-            "facebook_manual_connect": True,
-            "facebook_connected_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"$set": update_data}
     )
     
-    logging.info(f"[FACEBOOK] Manually connected page {page_id} for site {site_id}")
+    logging.info(f"[FACEBOOK] Manually connected page {page_id} for site {site_id} (with token: {bool(page_token)})")
     return {"success": True, "page_id": page_id}
 
 
