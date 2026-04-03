@@ -4616,6 +4616,8 @@ async def test_facebook_post(site_id: str, user: dict = Depends(get_current_user
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
+    site_url = site.get("site_url", "https://example.com")
+    
     # Use page_id from DB (BYOAK) or fallback to hardcoded mapping
     page_id = site.get("facebook_page_id")
     fb_token = site.get("facebook_page_token")
@@ -4623,8 +4625,8 @@ async def test_facebook_post(site_id: str, user: dict = Depends(get_current_user
     
     # Fallback to old system if no page_id in DB
     if not page_id:
-        site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/").lower()
-        page_id = get_facebook_page_id(site_url)
+        site_url_clean = site_url.replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/").lower()
+        page_id = get_facebook_page_id(site_url_clean)
     
     logging.info(f"[FB_TEST] Page ID: {page_id}, Page Name: {page_name}")
     logging.info(f"[FB_TEST] Token exists: {fb_token is not None and len(str(fb_token)) > 10}")
@@ -4647,7 +4649,7 @@ async def test_facebook_post(site_id: str, user: dict = Depends(get_current_user
             page_access_token=fb_token,
             page_id=page_id,
             message="🔧 Test de postare automată - va fi șters\n\nAcesta este un test pentru verificarea conexiunii Facebook.",
-            link=site.get("site_url", "https://example.com"),
+            link=site_url,
             image_url=None
         )
         
