@@ -4257,7 +4257,10 @@ async def facebook_oauth_callback(
             # Get ALL pages the user manages
             pages_response = await client.get(
                 "https://graph.facebook.com/v19.0/me/accounts",
-                params={"access_token": user_access_token}
+                params={
+                    "access_token": user_access_token,
+                    "fields": "id,name,access_token,category,tasks"
+                }
             )
             
             logging.info(f"Facebook pages API response status: {pages_response.status_code}")
@@ -4271,6 +4274,24 @@ async def facebook_oauth_callback(
             pages = pages_data.get("data", [])
             
             logging.info(f"Facebook pages found: {len(pages)}")
+            
+            # If no pages from /me/accounts, try getting pages from user's profile
+            if not pages:
+                # Try alternative endpoint
+                user_response = await client.get(
+                    "https://graph.facebook.com/v19.0/me",
+                    params={
+                        "access_token": user_access_token,
+                        "fields": "id,name,accounts{id,name,access_token,category}"
+                    }
+                )
+                logging.info(f"Facebook user+accounts response: {user_response.text[:500]}")
+                
+                if user_response.status_code == 200:
+                    user_data = user_response.json()
+                    accounts = user_data.get("accounts", {})
+                    pages = accounts.get("data", [])
+                    logging.info(f"Facebook pages from user endpoint: {len(pages)}")
             
             if not pages:
                 logging.error(f"No Facebook pages found. Full response: {pages_response.text}")
