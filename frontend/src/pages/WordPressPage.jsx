@@ -65,11 +65,20 @@ export default function WordPressPage() {
     // Check for OAuth callback messages
     const success = searchParams.get('success');
     const error = searchParams.get('error');
+    const pages = searchParams.get('pages');
     
     if (success === 'facebook_connected') {
       toast.success('Facebook conectat cu succes!');
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/app/wordpress');
+    } else if (success === 'facebook_pages_loaded') {
+      toast.success(`${pages || 'Mai multe'} pagini Facebook găsite! Selectează pagina din modal.`, { duration: 5000 });
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/app/wordpress');
     } else if (success === 'linkedin_connected') {
       toast.success('LinkedIn conectat cu succes!');
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/app/wordpress');
     } else if (error) {
       // User-friendly error messages
       const errorMessages = {
@@ -80,6 +89,8 @@ export default function WordPressPage() {
       };
       const message = errorMessages[error] || `Eroare la conectare: ${error.replace(/_/g, ' ')}`;
       toast.error(message, { duration: 8000 });
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/app/wordpress');
     }
   }, [searchParams]);
 
