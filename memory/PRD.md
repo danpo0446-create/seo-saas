@@ -52,7 +52,29 @@ Collections:
 
 ## What's Been Implemented
 
-### Date: 2026-04-02 (Latest)
+### Date: 2026-04-03 (Latest)
+
+#### Facebook Page Selection UI ✅
+- **NEW** Dropdown selector în modal-ul social pentru alegerea paginii Facebook
+- **NEW** State-uri pentru `selectedFacebookPage` și `savingFacebookPage` în WordPressPage.jsx
+- **NEW** Funcția `selectFacebookPage()` care salvează pagina selectată via API
+- UI: Apare automat când `pages_pending=true` și `available_pages` conține pagini
+- După selectare, badge-ul "Conectat" apare cu butoanele "Test Post" și "Deconectează"
+
+#### Scheduler Improvements ✅
+- **FIX** Adăugat `misfire_grace_time=7200` (2 ore) pentru a prinde job-uri ratate
+- **FIX** Adăugat `coalesce=True` pentru a rula o singură dată dacă multiple execuții au fost ratate
+- **FIX** Adăugat `max_instances=1` pentru a preveni execuții paralele
+- **NEW** Job de recovery zilnic la 10:30 AM care verifică job-urile ratate
+- **NEW** Logare detaliată pentru diagnosticare scheduler
+
+#### Social BYOAK Architecture ✅
+- Facebook App ID/Secret stocat în `user_api_keys` collection
+- LinkedIn Client ID/Secret stocat în `user_api_keys` collection
+- OAuth flow folosește cheile utilizatorului pentru autentificare
+- Pages disponibile salvate în DB pentru selecție ulterioară
+
+### Date: 2026-04-02
 
 #### Backlink Automation Module ✅
 - **NEW** `BacklinkAutomationPage.jsx` - Pagină monitorizare automatizare backlinks
@@ -153,6 +175,17 @@ Collections:
 - `GET /api/saas/invoices` - List invoices
 - `GET /api/saas/invoices/{id}/pdf` - Download invoice PDF
 
+### Social Media Endpoints
+- `GET /api/social/status/{site_id}` - Get Facebook/LinkedIn connection status + available_pages
+- `GET /api/social/facebook/auth-url/{site_id}` - Get Facebook OAuth URL
+- `GET /api/social/facebook/pages/{site_id}` - Get available Facebook pages
+- `POST /api/social/facebook/select-page/{site_id}?page_id={id}` - Select Facebook page
+- `DELETE /api/social/facebook/disconnect/{site_id}` - Disconnect Facebook
+- `POST /api/social/facebook/test-post/{site_id}` - Test Facebook posting
+- `GET /api/social/linkedin/auth-url/{site_id}` - Get LinkedIn OAuth URL
+- `DELETE /api/social/linkedin/disconnect/{site_id}` - Disconnect LinkedIn
+- `POST /api/social/linkedin/test-post/{site_id}` - Test LinkedIn posting
+
 ## Prioritized Backlog
 
 ### P0 (Critical) - DONE ✅
@@ -161,8 +194,11 @@ Collections:
 - ✅ Admin user management
 - ✅ User password change functionality
 - ✅ Admin password reset for users
+- ✅ Facebook Page Selection UI
+- ✅ Scheduler reliability improvements (misfire_grace_time, daily recovery)
 
 ### P1 (High) - Pending
+- [ ] Verificare email sending reliability (Resend/SendGrid) via BYOAK
 - [ ] Configure production Stripe keys on VPS
 - [ ] Configure RESEND_API_KEY on VPS for email notifications
 - [ ] Update contact info in Contact page from admin
