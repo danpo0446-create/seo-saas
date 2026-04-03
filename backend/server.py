@@ -4172,14 +4172,16 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     redirect_uri = APP_URL + '/api/social/facebook/callback'
     
     # Facebook OAuth URL
-    # Requires Business app with "Manage everything on your Page" use case
-    # pages_show_list forces Facebook to show page selection dialog
+    # Using Facebook Login for Business flow for Business apps
+    # This flow returns page tokens directly
     auth_url = (
         f"https://www.facebook.com/v19.0/dialog/oauth?"
         f"client_id={fb_app_id}"
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
-        f"&scope=pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content"
+        f"&scope=pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content,business_management"
+        f"&response_type=code"
+        f"&config_id="  # For Facebook Login for Business, add config_id if available
     )
     
     return {
@@ -4275,9 +4277,11 @@ async def facebook_oauth_callback(
             
             logging.info(f"Facebook pages found: {len(pages)}")
             
-            # If no pages from /me/accounts, try getting pages from user's profile
+            # If no pages from /me/accounts, try alternative methods for Business apps
             if not pages:
-                # Try alternative endpoint
+                logging.info("[FB] No pages from /me/accounts, trying alternative methods...")
+                
+                # Method 2: Try /me?fields=accounts
                 user_response = await client.get(
                     "https://graph.facebook.com/v19.0/me",
                     params={
@@ -4292,6 +4296,46 @@ async def facebook_oauth_callback(
                     accounts = user_data.get("accounts", {})
                     pages = accounts.get("data", [])
                     logging.info(f"Facebook pages from user endpoint: {len(pages)}")
+                
+                # Method 3: For Business apps, try getting pages via Business API
+                if not pages:
+                    logging.info("[FB] Trying Business API for pages...")
+                    business_response = await client.get(
+                        "https://graph.facebook.com/v19.0/me/businesses",
+                        params={"access_token": user_access_token}
+                    )
+                    logging.info(f"Facebook businesses response: {business_response.text[:300]}")
+                    
+                    if business_response.status_code == 200:
+                        businesses = business_response.json().get("data", [])
+                        for business in businesses:
+                            business_id = business.get("id")
+                            # Get pages owned by this business
+                            biz_pages_response = await client.get(
+                                f"https://graph.facebook.com/v19.0/{business_id}/owned_pages",
+                                params={
+                                    "access_token": user_access_token,
+                                    "fields": "id,name,access_token"
+                                }
+                            )
+                            logging.info(f"Business {business_id} pages: {biz_pages_response.text[:300]}")
+                            if biz_pages_response.status_code == 200:
+                                biz_pages = biz_pages_response.json().get("data", [])
+                                pages.extend(biz_pages)
+                
+                # Method 4: Try client_pages endpoint for Business apps
+                if not pages:
+                    logging.info("[FB] Trying client_pages endpoint...")
+                    client_pages_response = await client.get(
+                        "https://graph.facebook.com/v19.0/me/client_pages",
+                        params={
+                            "access_token": user_access_token,
+                            "fields": "id,name,access_token"
+                        }
+                    )
+                    logging.info(f"Facebook client_pages response: {client_pages_response.text[:300]}")
+                    if client_pages_response.status_code == 200:
+                        pages = client_pages_response.json().get("data", [])
             
             if not pages:
                 logging.error(f"No Facebook pages found. Full response: {pages_response.text}")
