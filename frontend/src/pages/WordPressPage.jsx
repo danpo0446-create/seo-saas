@@ -921,7 +921,7 @@ export default function WordPressPage() {
                       </p>
                     </div>
                   </div>
-                  {socialStatus.facebook?.connected && (
+                  {socialStatus.facebook?.connected ? (
                     <div className="flex items-center gap-2">
                       <Badge className="bg-green-500/10 text-green-500">Conectat</Badge>
                       <Button
@@ -943,57 +943,47 @@ export default function WordPressPage() {
                         Deconectează
                       </Button>
                     </div>
+                  ) : (
+                    <Button
+                      onClick={() => connectFacebook(socialModal.id)}
+                      className="bg-blue-500 hover:bg-blue-600 text-white"
+                      data-testid="connect-facebook-btn"
+                    >
+                      Conectează
+                    </Button>
                   )}
                 </div>
                 
-                {/* Important notice about Facebook Business App */}
+                {/* Manual fallback - only show if not connected */}
                 {!socialStatus.facebook?.connected && (
                   <div className="mt-3 p-3 rounded-lg bg-secondary/50 border border-border">
-                    <p className="text-sm font-medium mb-3">Conectare Facebook Page:</p>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Page ID</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: 112431577304128"
-                          value={manualPageId || ''}
-                          onChange={(e) => setManualPageId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                          data-testid="manual-page-id-input"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">Facebook → Pagina ta → About → Page ID</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Page Access Token</label>
-                        <input
-                          type="text"
-                          placeholder="Token generat din Graph API Explorer"
-                          value={manualPageToken || ''}
-                          onChange={(e) => setManualPageToken(e.target.value)}
-                          className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                          data-testid="manual-page-token-input"
-                        />
-                        <a 
-                          href="https://developers.facebook.com/tools/explorer/" 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-xs text-blue-500 underline"
-                        >
-                          Generează token aici →
-                        </a>
-                      </div>
+                    <p className="text-xs text-muted-foreground mb-2">Sau conectare manuală (dacă OAuth nu funcționează):</p>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Page ID (din Facebook → About)"
+                        value={manualPageId || ''}
+                        onChange={(e) => setManualPageId(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                        data-testid="manual-page-id-input"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Page Access Token"
+                        value={manualPageToken || ''}
+                        onChange={(e) => setManualPageToken(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                        data-testid="manual-page-token-input"
+                      />
                       <Button
                         onClick={() => saveManualPageId(socialModal.id, manualPageId, manualPageToken)}
                         disabled={!manualPageId || !manualPageToken || savingFacebookPage}
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
                         data-testid="save-manual-page-btn"
                       >
-                        {savingFacebookPage ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        ) : (
-                          <Save className="w-4 h-4 mr-2" />
-                        )}
-                        Salvează
+                        {savingFacebookPage ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvează manual'}
                       </Button>
                     </div>
                   </div>
