@@ -4260,6 +4260,9 @@ async def facebook_oauth_callback(
                 params={"access_token": user_access_token}
             )
             
+            logging.info(f"Facebook pages API response status: {pages_response.status_code}")
+            logging.info(f"Facebook pages API response: {pages_response.text[:500]}")
+            
             if pages_response.status_code != 200:
                 logging.error(f"Facebook pages error: {pages_response.text}")
                 return RedirectResponse(url=f"/wordpress?error=facebook_pages_error")
@@ -4267,8 +4270,10 @@ async def facebook_oauth_callback(
             pages_data = pages_response.json()
             pages = pages_data.get("data", [])
             
+            logging.info(f"Facebook pages found: {len(pages)}")
+            
             if not pages:
-                logging.error("No Facebook pages found")
+                logging.error(f"No Facebook pages found. Full response: {pages_response.text}")
                 return RedirectResponse(url=f"/wordpress?error=no_facebook_pages")
             
             # Save pages list for user to select later
