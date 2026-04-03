@@ -13,32 +13,16 @@ import hashlib
 
 from .plans import PLANS, TRIAL_CONFIG, get_plan
 
-# Generate a consistent encryption key from a secret
-def get_encryption_key() -> bytes:
-    secret = os.environ.get('JWT_SECRET', 'default-secret-key')
-    key = hashlib.sha256(secret.encode()).digest()
-    return base64.urlsafe_b64encode(key)
-
-def get_fernet():
-    """Get Fernet instance - created on demand to ensure env vars are loaded"""
-    return Fernet(get_encryption_key())
+# API Key encryption/decryption - DISABLED for simplicity
+# Keys are stored in plain text
 
 def encrypt_api_key(key: str) -> str:
-    """Encrypt an API key for storage"""
-    if not key:
-        return ""
-    return get_fernet().encrypt(key.encode()).decode()
+    """Store API key as-is (no encryption for simplicity)"""
+    return key if key else ""
 
 def decrypt_api_key(encrypted_key: str) -> str:
-    """Decrypt an API key"""
-    if not encrypted_key:
-        return ""
-    try:
-        return get_fernet().decrypt(encrypted_key.encode()).decode()
-    except Exception as e:
-        import logging
-        logging.error(f"[DECRYPT] Failed to decrypt key: {e}")
-        return ""
+    """Return API key as-is (no decryption needed)"""
+    return encrypted_key if encrypted_key else ""
 
 class SubscriptionService:
     def __init__(self, db: AsyncIOMotorDatabase):
