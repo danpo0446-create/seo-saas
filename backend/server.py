@@ -4120,6 +4120,29 @@ async def get_gsc_opportunities_for_scoring(user_id: str, site_url: str) -> List
 # ============ SOCIAL MEDIA INTEGRATION ROUTES ============
 
 from config import FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, APP_URL
+
+# Helper to get user's social media credentials
+async def get_user_social_keys(user_id: str):
+    """Get user's Facebook/LinkedIn app credentials from BYOAK"""
+    user_keys = await db.user_api_keys.find_one({"user_id": user_id})
+    
+    if user_keys:
+        return {
+            "facebook_app_id": user_keys.get("facebook_app_id") or FACEBOOK_APP_ID,
+            "facebook_app_secret": user_keys.get("facebook_app_secret") or FACEBOOK_APP_SECRET,
+            "linkedin_client_id": user_keys.get("linkedin_client_id") or LINKEDIN_CLIENT_ID,
+            "linkedin_client_secret": user_keys.get("linkedin_client_secret") or LINKEDIN_CLIENT_SECRET
+        }
+    
+    # Fallback to platform keys
+    return {
+        "facebook_app_id": FACEBOOK_APP_ID,
+        "facebook_app_secret": FACEBOOK_APP_SECRET,
+        "linkedin_client_id": LINKEDIN_CLIENT_ID,
+        "linkedin_client_secret": LINKEDIN_CLIENT_SECRET
+    }
+
+
 # Facebook OAuth endpoints
 @api_router.get("/social/facebook/auth-url/{site_id}")
 async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_user)):
@@ -4128,12 +4151,12 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
-    page_id = get_facebook_page_id(site_url)
-    page_name = get_facebook_page_name(site_url)
+    # Get user's Facebook credentials (BYOAK)
+    social_keys = await get_user_social_keys(user["id"])
+    fb_app_id = social_keys["facebook_app_id"]
     
-    if not page_id:
-        raise HTTPException(status_code=400, detail="No Facebook page configured for this site")
+    if not fb_app_id:
+        raise HTTPException(status_code=400, detail="Nu ai configurat Facebook App ID. Mergi la Chei API pentru a-l adăuga.")
     
     # Store state for callback
     state = f"{user['id']}:{site_id}"
@@ -4143,7 +4166,7 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     # Facebook OAuth URL with page permissions
     auth_url = (
         f"https://www.facebook.com/v19.0/dialog/oauth?"
-        f"client_id={FACEBOOK_APP_ID}"
+        f"client_id={fb_app_id}"
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
         f"&scope=pages_manage_posts,pages_read_engagement,pages_show_list"
@@ -4151,8 +4174,7 @@ async def get_facebook_auth_url(site_id: str, user: dict = Depends(get_current_u
     
     return {
         "authorization_url": auth_url,
-        "page_id": page_id,
-        "page_name": page_name
+        "message": "După autorizare, vei putea selecta pagina Facebook"
     }
 
 @api_router.get("/social/facebook/callback")
@@ -4165,14 +4187,22 @@ async def facebook_oauth_callback(code: str = Query(...), state: str = Query(...
     
     redirect_uri = APP_URL + '/api/social/facebook/callback'
     
+    # Get user's Facebook credentials (BYOAK)
+    social_keys = await get_user_social_keys(user_id)
+    fb_app_id = social_keys["facebook_app_id"]
+    fb_app_secret = social_keys["facebook_app_secret"]
+    
+    if not fb_app_id or not fb_app_secret:
+        return RedirectResponse(url=f"/wordpress?error=facebook_credentials_missing")
+    
     try:
         async with httpx.AsyncClient() as client:
             # Exchange code for access token
             token_response = await client.get(
                 "https://graph.facebook.com/v19.0/oauth/access_token",
                 params={
-                    "client_id": FACEBOOK_APP_ID,
-                    "client_secret": FACEBOOK_APP_SECRET,
+                    "client_id": fb_app_id,
+                    "client_secret": fb_app_secret,
                     "redirect_uri": redirect_uri,
                     "code": code
                 }
@@ -4190,8 +4220,8 @@ async def facebook_oauth_callback(code: str = Query(...), state: str = Query(...
                 "https://graph.facebook.com/v19.0/oauth/access_token",
                 params={
                     "grant_type": "fb_exchange_token",
-                    "client_id": FACEBOOK_APP_ID,
-                    "client_secret": FACEBOOK_APP_SECRET,
+                    "client_id": fb_app_id,
+                    "client_secret": fb_app_secret,
                     "fb_exchange_token": user_access_token
                 }
             )
@@ -4200,7 +4230,7 @@ async def facebook_oauth_callback(code: str = Query(...), state: str = Query(...
                 long_token_data = long_token_response.json()
                 user_access_token = long_token_data.get("access_token", user_access_token)
             
-            # Get page access token
+            # Get ALL pages the user manages
             pages_response = await client.get(
                 "https://graph.facebook.com/v19.0/me/accounts",
                 params={"access_token": user_access_token}
@@ -4213,101 +4243,116 @@ async def facebook_oauth_callback(code: str = Query(...), state: str = Query(...
             pages_data = pages_response.json()
             pages = pages_data.get("data", [])
             
-            # Find the page for this site
+            if not pages:
+                logging.error("No Facebook pages found")
+                return RedirectResponse(url=f"/wordpress?error=no_facebook_pages")
+            
+            # Save pages list for user to select later
             site = await db.wordpress_configs.find_one({"id": site_id, "user_id": user_id})
             if not site:
                 return RedirectResponse(url=f"/wordpress?error=site_not_found")
             
-            site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
-            expected_page_id = get_facebook_page_id(site_url)
-            
-            page_token = None
-            for page in pages:
-                if page.get("id") == expected_page_id:
-                    page_token = page.get("access_token")
-                    break
-            
-            if not page_token:
-                # Use first available page token if exact match not found
-                if pages:
-                    page_token = pages[0].get("access_token")
-                    logging.warning(f"Using first available page token for site {site_id}")
-            
-            if page_token:
-                # Save page token to site config
+            # If only one page, auto-select it
+            if len(pages) == 1:
+                selected_page = pages[0]
                 await db.wordpress_configs.update_one(
                     {"id": site_id, "user_id": user_id},
                     {"$set": {
-                        "facebook_page_token": page_token,
+                        "facebook_page_token": selected_page.get("access_token"),
+                        "facebook_page_id": selected_page.get("id"),
+                        "facebook_page_name": selected_page.get("name"),
                         "facebook_connected": True,
-                        "facebook_connected_at": datetime.now(timezone.utc).isoformat()
+                        "facebook_connected_at": datetime.now(timezone.utc).isoformat(),
+                        "facebook_pages": pages  # Store all pages for reference
                     }}
                 )
-                logging.info(f"Facebook connected for site {site_id}")
-                
-                # ALSO save tokens for ALL other sites of this user that have matching pages
-                logging.info(f"[FACEBOOK] Found {len(pages)} pages in user account. Checking all sites...")
-                
-                # Get ALL sites for this user
-                all_user_sites = await db.wordpress_configs.find(
-                    {"user_id": user_id},
-                    {"_id": 0, "id": 1, "site_url": 1, "site_name": 1}
-                ).to_list(100)
-                
-                logging.info(f"[FACEBOOK] User has {len(all_user_sites)} sites configured")
-                
-                for page in pages:
-                    page_id = page.get("id")
-                    page_access_token = page.get("access_token")
-                    page_name = page.get("name", "")
-                    
-                    if not page_id or not page_access_token:
-                        continue
-                    
-                    logging.info(f"[FACEBOOK] Processing page: {page_name} (ID: {page_id})")
-                    
-                    # Find which site URL this page belongs to by checking FACEBOOK_PAGES mapping
-                    for site_domain, fb_info in FACEBOOK_PAGES.items():
-                        if fb_info.get("page_id") == page_id:
-                            logging.info(f"[FACEBOOK] Page {page_name} matches domain {site_domain}")
-                            
-                            # Find the site with this domain
-                            for user_site in all_user_sites:
-                                user_site_url = user_site.get("site_url", "").lower()
-                                # Check if domain is in site URL
-                                if site_domain.lower() in user_site_url:
-                                    target_site_id = user_site.get("id")
-                                    if target_site_id != site_id:  # Don't update the current site again
-                                        await db.wordpress_configs.update_one(
-                                            {"id": target_site_id, "user_id": user_id},
-                                            {"$set": {
-                                                "facebook_page_token": page_access_token,
-                                                "facebook_connected": True,
-                                                "facebook_connected_at": datetime.now(timezone.utc).isoformat()
-                                            }}
-                                        )
-                                        logging.info(f"[FACEBOOK] ✓ Connected page '{page_name}' to site {user_site.get('site_name', target_site_id)}")
-                                    break
-                
+                logging.info(f"Facebook auto-connected page '{selected_page.get('name')}' for site {site_id}")
                 return RedirectResponse(url=f"/wordpress?success=facebook_connected")
-            else:
-                return RedirectResponse(url=f"/wordpress?error=no_page_access")
+            
+            # Multiple pages - save all for selection
+            await db.wordpress_configs.update_one(
+                {"id": site_id, "user_id": user_id},
+                {"$set": {
+                    "facebook_pages": pages,
+                    "facebook_user_token": user_access_token,
+                    "facebook_connected": False,  # Not fully connected until page selected
+                    "facebook_pages_pending": True
+                }}
+            )
+            logging.info(f"Facebook has {len(pages)} pages - user needs to select one")
+            return RedirectResponse(url=f"/wordpress?success=facebook_pages_loaded&pages={len(pages)}")
             
     except Exception as e:
         logging.error(f"Facebook callback error: {str(e)}")
         return RedirectResponse(url=f"/wordpress?error=facebook_error")
 
+
+@api_router.get("/social/facebook/pages/{site_id}")
+async def get_facebook_pages(site_id: str, user: dict = Depends(get_current_user)):
+    """Get available Facebook pages for a site"""
+    site = await db.wordpress_configs.find_one(
+        {"id": site_id, "user_id": user["id"]},
+        {"_id": 0, "facebook_pages": 1, "facebook_page_id": 1, "facebook_page_name": 1}
+    )
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    pages = site.get("facebook_pages", [])
+    return {
+        "pages": [{"id": p.get("id"), "name": p.get("name")} for p in pages],
+        "selected_page_id": site.get("facebook_page_id"),
+        "selected_page_name": site.get("facebook_page_name")
+    }
+
+
+@api_router.post("/social/facebook/select-page/{site_id}")
+async def select_facebook_page(site_id: str, page_id: str, user: dict = Depends(get_current_user)):
+    """Select which Facebook page to use for a site"""
+    site = await db.wordpress_configs.find_one(
+        {"id": site_id, "user_id": user["id"]},
+        {"_id": 0, "facebook_pages": 1}
+    )
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    pages = site.get("facebook_pages", [])
+    selected_page = None
+    for page in pages:
+        if page.get("id") == page_id:
+            selected_page = page
+            break
+    
+    if not selected_page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    
+    await db.wordpress_configs.update_one(
+        {"id": site_id, "user_id": user["id"]},
+        {"$set": {
+            "facebook_page_token": selected_page.get("access_token"),
+            "facebook_page_id": selected_page.get("id"),
+            "facebook_page_name": selected_page.get("name"),
+            "facebook_connected": True,
+            "facebook_pages_pending": False,
+            "facebook_connected_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"success": True, "page_name": selected_page.get("name")}
+
+
 @api_router.get("/social/linkedin/auth-url/{site_id}")
 async def get_linkedin_auth_url(site_id: str, user: dict = Depends(get_current_user)):
-    """Get LinkedIn OAuth URL for a specific site (only for seamanshelp)"""
+    """Get LinkedIn OAuth URL for a specific site"""
     site = await db.wordpress_configs.find_one({"id": site_id, "user_id": user["id"]}, {"_id": 0})
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
+    # Get user's LinkedIn credentials (BYOAK)
+    social_keys = await get_user_social_keys(user["id"])
+    linkedin_client_id = social_keys["linkedin_client_id"]
     
-    if "seamanshelp" not in site_url:
-        raise HTTPException(status_code=400, detail="LinkedIn is only configured for seamanshelp.com")
+    if not linkedin_client_id:
+        raise HTTPException(status_code=400, detail="Nu ai configurat LinkedIn Client ID. Mergi la Chei API pentru a-l adăuga.")
     
     state = f"{user['id']}:{site_id}"
     redirect_uri = APP_URL + '/api/social/linkedin/callback'
@@ -4315,7 +4360,7 @@ async def get_linkedin_auth_url(site_id: str, user: dict = Depends(get_current_u
     auth_url = (
         f"https://www.linkedin.com/oauth/v2/authorization?"
         f"response_type=code"
-        f"&client_id={LINKEDIN_CLIENT_ID}"
+        f"&client_id={linkedin_client_id}"
         f"&redirect_uri={redirect_uri}"
         f"&state={state}"
         f"&scope=openid%20profile%20w_member_social"
@@ -4346,6 +4391,14 @@ async def linkedin_oauth_callback(
     
     redirect_uri = APP_URL + '/api/social/linkedin/callback'
     
+    # Get user's LinkedIn credentials (BYOAK)
+    social_keys = await get_user_social_keys(user_id)
+    linkedin_client_id = social_keys["linkedin_client_id"]
+    linkedin_client_secret = social_keys["linkedin_client_secret"]
+    
+    if not linkedin_client_id or not linkedin_client_secret:
+        return RedirectResponse(url=f"/wordpress?error=linkedin_credentials_missing")
+    
     try:
         async with httpx.AsyncClient() as client:
             # Exchange code for access token
@@ -4355,8 +4408,8 @@ async def linkedin_oauth_callback(
                     "grant_type": "authorization_code",
                     "code": code,
                     "redirect_uri": redirect_uri,
-                    "client_id": LINKEDIN_CLIENT_ID,
-                    "client_secret": LINKEDIN_CLIENT_SECRET
+                    "client_id": linkedin_client_id,
+                    "client_secret": linkedin_client_secret
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
@@ -4416,27 +4469,39 @@ async def get_social_status(site_id: str, user: dict = Depends(get_current_user)
     site = await db.wordpress_configs.find_one(
         {"id": site_id, "user_id": user["id"]},
         {"_id": 0, "facebook_connected": 1, "facebook_connected_at": 1, 
+         "facebook_page_id": 1, "facebook_page_name": 1, "facebook_pages": 1, "facebook_pages_pending": 1,
          "linkedin_connected": 1, "linkedin_connected_at": 1, "linkedin_person_name": 1, "site_url": 1}
     )
     
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
+    # Get page info from DB (BYOAK) or fallback to hardcoded
+    fb_page_id = site.get("facebook_page_id")
+    fb_page_name = site.get("facebook_page_name")
+    fb_pages_list = site.get("facebook_pages", [])
+    
+    # Fallback to old system
+    if not fb_page_id:
+        site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
+        fb_page_id = get_facebook_page_id(site_url)
+        fb_page_name = get_facebook_page_name(site_url)
     
     return {
         "facebook": {
             "connected": site.get("facebook_connected", False),
             "connected_at": site.get("facebook_connected_at"),
-            "page_name": get_facebook_page_name(site_url),
-            "page_id": get_facebook_page_id(site_url)
+            "page_name": fb_page_name,
+            "page_id": fb_page_id,
+            "pages_pending": site.get("facebook_pages_pending", False),
+            "available_pages": [{"id": p.get("id"), "name": p.get("name")} for p in fb_pages_list]
         },
         "linkedin": {
             "connected": site.get("linkedin_connected", False),
             "connected_at": site.get("linkedin_connected_at"),
             "person_name": site.get("linkedin_person_name", ""),
-            "available": "seamanshelp" in site_url,
-            "type": "personal"  # Now using personal profile
+            "available": True,  # Now available for all sites
+            "type": "personal"
         }
     }
 
@@ -4464,18 +4529,23 @@ async def test_facebook_post(site_id: str, user: dict = Depends(get_current_user
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/").lower()
-    page_id = get_facebook_page_id(site_url)
+    # Use page_id from DB (BYOAK) or fallback to hardcoded mapping
+    page_id = site.get("facebook_page_id")
     fb_token = site.get("facebook_page_token")
+    page_name = site.get("facebook_page_name", "Unknown")
     
-    logging.info(f"[FB_TEST] Site URL: {site_url}")
-    logging.info(f"[FB_TEST] Page ID from mapping: {page_id}")
+    # Fallback to old system if no page_id in DB
+    if not page_id:
+        site_url = site.get("site_url", "").replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/").lower()
+        page_id = get_facebook_page_id(site_url)
+    
+    logging.info(f"[FB_TEST] Page ID: {page_id}, Page Name: {page_name}")
     logging.info(f"[FB_TEST] Token exists: {fb_token is not None and len(str(fb_token)) > 10}")
     
     if not page_id:
         return {
             "success": False,
-            "error": f"Site {site_url} nu este configurat în FACEBOOK_PAGES. Site-uri disponibile: {list(FACEBOOK_PAGES.keys())}"
+            "error": "Nu ai selectat o pagină Facebook. Conectează Facebook și selectează pagina."
         }
     
     if not fb_token:
