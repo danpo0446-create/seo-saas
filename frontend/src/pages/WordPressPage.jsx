@@ -47,6 +47,7 @@ export default function WordPressPage() {
   const [socialStatus, setSocialStatus] = useState({});
   const [selectedFacebookPage, setSelectedFacebookPage] = useState('');
   const [savingFacebookPage, setSavingFacebookPage] = useState(false);
+  const [manualPageId, setManualPageId] = useState('');
   const [formData, setFormData] = useState({
     site_url: '',
     site_name: '',
@@ -356,6 +357,34 @@ export default function WordPressPage() {
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Eroare la selectarea paginii');
+    } finally {
+      setSavingFacebookPage(false);
+    }
+  };
+
+  const saveManualPageId = async (siteId, pageId) => {
+    if (!pageId || !pageId.trim()) {
+      toast.error('Introdu un Page ID valid');
+      return;
+    }
+    setSavingFacebookPage(true);
+    try {
+      const response = await axios.post(
+        `${API}/social/facebook/manual-connect/${siteId}`,
+        { page_id: pageId.trim() },
+        { headers: getAuthHeaders() }
+      );
+      if (response.data.success) {
+        toast.success('Pagina Facebook conectată manual!');
+        setManualPageId('');
+        // Refresh social status
+        const statusResponse = await axios.get(`${API}/social/status/${siteId}`, { 
+          headers: getAuthHeaders() 
+        });
+        setSocialStatus(statusResponse.data);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Eroare la salvarea Page ID');
     } finally {
       setSavingFacebookPage(false);
     }
@@ -921,8 +950,42 @@ export default function WordPressPage() {
                 
                 {/* Important notice about Facebook Business App */}
                 {!socialStatus.facebook?.connected && (
-                  <div className="text-xs text-muted-foreground bg-secondary/50 p-2 rounded border border-border">
-                    <strong>Configurare:</strong> Necesită aplicație Facebook cu use case "Manage everything on your Page".
+                  <div className="text-xs text-muted-foreground bg-secondary/50 p-2 rounded border border-border space-y-2">
+                    <p><strong>Configurare:</strong> Necesită aplicație Facebook cu use case "Manage everything on your Page".</p>
+                    <p className="text-amber-500">Dacă conexiunea nu funcționează, poți introduce manual Page ID-ul de pe Facebook.</p>
+                  </div>
+                )}
+                
+                {/* Manual Page ID Entry - fallback when OAuth doesn't return pages */}
+                {!socialStatus.facebook?.connected && (
+                  <div className="mt-3 p-3 rounded-lg bg-secondary/50 border border-border">
+                    <p className="text-sm font-medium mb-2">Conectare manuală (alternativ):</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Facebook Page ID (ex: 123456789)"
+                        value={manualPageId || ''}
+                        onChange={(e) => setManualPageId(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm"
+                        data-testid="manual-page-id-input"
+                      />
+                      <Button
+                        onClick={() => saveManualPageId(socialModal.id, manualPageId)}
+                        disabled={!manualPageId || savingFacebookPage}
+                        variant="outline"
+                        className="border-blue-500/30 text-blue-500"
+                        data-testid="save-manual-page-btn"
+                      >
+                        {savingFacebookPage ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Salvează'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Găsești Page ID în: Facebook → Pagina ta → About → Page ID
+                    </p>
                   </div>
                 )}
                 
