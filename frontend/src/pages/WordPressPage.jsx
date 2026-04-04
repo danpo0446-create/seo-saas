@@ -704,18 +704,16 @@ export default function WordPressPage() {
                               FB Neconectat
                             </Badge>
                           )}
-                          {site.site_url?.includes('seamanshelp') && (
-                            site.linkedin_connected ? (
-                              <Badge className="bg-blue-700 text-white border-0 hover:bg-blue-800 cursor-pointer" onClick={() => openSocialModal(site)}>
-                                <Linkedin className="w-3 h-3 mr-1" />
-                                LI Conectat
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs text-muted-foreground border-dashed cursor-pointer hover:border-blue-700 hover:text-blue-700" onClick={() => openSocialModal(site)}>
-                                <Linkedin className="w-3 h-3 mr-1" />
-                                LI Neconectat
-                              </Badge>
-                            )
+                          {site.linkedin_connected ? (
+                            <Badge className="bg-blue-700 text-white border-0 hover:bg-blue-800 cursor-pointer" onClick={() => openSocialModal(site)}>
+                              <Linkedin className="w-3 h-3 mr-1" />
+                              LI Conectat
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground border-dashed cursor-pointer hover:border-blue-700 hover:text-blue-700" onClick={() => openSocialModal(site)}>
+                              <Linkedin className="w-3 h-3 mr-1" />
+                              LI Neconectat
+                            </Badge>
                           )}
                         </div>
                       </div>
