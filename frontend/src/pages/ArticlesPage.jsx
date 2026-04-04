@@ -254,7 +254,7 @@ export default function ArticlesPage() {
         </div>
         <Button 
           className="bg-primary text-primary-foreground hover:bg-primary/90 neon-glow-hover"
-          onClick={() => navigate('/articles/new')}
+          onClick={() => navigate('/app/articles/new')}
           data-testid="generate-article-button"
         >
           <PlusCircle className="w-4 h-4 mr-2" />
@@ -273,7 +273,7 @@ export default function ArticlesPage() {
             </p>
             <Button 
               className="bg-primary text-primary-foreground"
-              onClick={() => navigate('/articles/new')}
+              onClick={() => navigate('/app/articles/new')}
             >
               <PlusCircle className="w-4 h-4 mr-2" />
               Primul Articol
