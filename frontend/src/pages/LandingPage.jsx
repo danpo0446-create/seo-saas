@@ -393,49 +393,22 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-[#262626] bg-[#0A0A0A]">
+      <footer className="py-12 px-4 border-t border-[#262626]">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            {/* Logo */}
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-[#00E676] flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-black" />
-                </div>
-                <span className="text-lg font-bold text-white">SEO Automation</span>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-[#00E676] flex items-center justify-center">
+                <Zap className="w-5 h-5 text-black" />
               </div>
-              <p className="text-[#71717A] text-sm max-w-md">
-                Platformă de automatizare SEO cu inteligență artificială. 
-                Generare articole, backlinks și optimizare automată pentru WordPress.
-              </p>
+              <span className="text-lg font-bold text-white">SEO Automation</span>
             </div>
-            
-            {/* Links */}
-            <div>
-              <h4 className="text-white font-semibold mb-4">Linkuri</h4>
-              <div className="space-y-2 text-sm">
-                <Link to="/pricing" className="block text-[#71717A] hover:text-[#00E676] transition-colors">Prețuri</Link>
-                <Link to="/contact" className="block text-[#71717A] hover:text-[#00E676] transition-colors">Contact</Link>
-              </div>
+            <div className="flex gap-8 text-[#71717A] text-sm">
+              <Link to="/terms" className="hover:text-white transition-colors">Termeni și Condiții</Link>
+              <Link to="/privacy" className="hover:text-white transition-colors">Confidențialitate</Link>
+              <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
             </div>
-            
-            {/* Legal */}
-            <div>
-              <h4 className="text-white font-semibold mb-4">Legal</h4>
-              <div className="space-y-2 text-sm">
-                <Link to="/terms" className="block text-[#71717A] hover:text-[#00E676] transition-colors">Termeni și Condiții</Link>
-                <Link to="/privacy" className="block text-[#71717A] hover:text-[#00E676] transition-colors">Confidențialitate</Link>
-              </div>
-            </div>
-          </div>
-          
-          {/* Bottom */}
-          <div className="border-t border-[#262626] pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-[#71717A] text-sm">
               © {new Date().getFullYear()} SEO Automation. Toate drepturile rezervate.
-            </div>
-            <div className="text-[#71717A] text-xs">
-              Powered by AI
             </div>
           </div>
         </div>
