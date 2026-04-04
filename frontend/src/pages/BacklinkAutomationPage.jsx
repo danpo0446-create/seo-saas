@@ -24,6 +24,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export default function BacklinkAutomationPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
   const { getAuthHeaders } = useAuth();
 
   const fetchStatus = async () => {
@@ -35,6 +36,19 @@ export default function BacklinkAutomationPage() {
       toast.error('Eroare la încărcarea statusului');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerAutomation = async () => {
+    setTriggering(true);
+    try {
+      const response = await axios.post(`${API}/backlinks/trigger-outreach`, {}, { headers: getAuthHeaders() });
+      toast.success(response.data.message || 'Automatizare declanșată!');
+      fetchStatus();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Eroare la declanșare');
+    } finally {
+      setTriggering(false);
     }
   };
 
@@ -61,16 +75,31 @@ export default function BacklinkAutomationPage() {
           <h1 className="text-2xl font-bold text-white">Automatizare Backlinks</h1>
           <p className="text-[#71717A]">Monitorizare căutare oportunități și trimitere emailuri</p>
         </div>
-        <Button 
-          onClick={fetchStatus} 
-          variant="outline" 
-          className="border-[#262626] hover:bg-[#171717]"
-          disabled={loading}
-          data-testid="refresh-btn"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Reîmprospătează
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={triggerAutomation}
+            className="bg-[#00E676] text-black hover:bg-[#00E676]/90"
+            disabled={triggering}
+            data-testid="trigger-automation-btn"
+          >
+            {triggering ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4 mr-2" />
+            )}
+            Declanșează Acum
+          </Button>
+          <Button 
+            onClick={fetchStatus} 
+            variant="outline" 
+            className="border-[#262626] hover:bg-[#171717]"
+            disabled={loading}
+            data-testid="refresh-btn"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Reîmprospătează
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

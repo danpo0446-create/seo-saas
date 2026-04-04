@@ -2591,6 +2591,209 @@ async def trigger_backlink_search(user: dict = Depends(get_current_user)):
     
     return {"success": True, "new_opportunities": total_found}
 
+
+@api_router.post("/backlinks/trigger-outreach")
+async def trigger_backlink_outreach(user: dict = Depends(get_current_user)):
+    """Manually trigger backlink outreach automation for current user's sites"""
+    import asyncio
+    
+    user_id = user["id"]
+    user_email = user.get("email", "")
+    user_name = user.get("name", "SEO Team")
+    
+    llm_api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not llm_api_key:
+        raise HTTPException(status_code=500, detail="LLM nu este configurat. Adaugă EMERGENT_LLM_KEY în .env")
+    
+    # Get user's sites
+    sites = await db.wordpress_configs.find(
+        {"user_id": user_id},
+        {"_id": 0, "id": 1, "site_url": 1, "site_name": 1, "niche": 1}
+    ).to_list(100)
+    
+    if not sites:
+        raise HTTPException(status_code=400, detail="Nu ai niciun site configurat")
+    
+    total_searched = 0
+    total_emails = 0
+    
+    for site in sites:
+        site_id = site.get("id")
+        site_name = site.get("site_name") or site.get("site_url", "Unknown")
+        niche = site.get("niche")
+        
+        if not niche:
+            continue
+        
+        logging.info(f"[MANUAL OUTREACH] Processing site: {site_name} ({niche})")
+        
+        try:
+            # Step 1: Search for 5 new FREE opportunities
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            
+            existing = await db.niche_backlinks.find(
+                {"niche": niche, "user_id": user_id},
+                {"_id": 0, "domain": 1}
+            ).to_list(500)
+            existing_domains = [b.get("domain") for b in existing]
+            
+            chat_instance = LlmChat(api_key=llm_api_key, system_message="You are an SEO expert.")
+            chat_instance.with_model("openai", "gpt-4o")
+            
+            prompt = f"""Find 5 FREE backlink opportunities for a website in the "{niche}" niche.
+            
+            Focus on:
+            - Free guest posting sites
+            - Free directories
+            - Free blog comment sites
+            - Free forum posting
+            - Free profile creation sites
+            
+            Exclude these domains: {', '.join(existing_domains[:50]) if existing_domains else 'None'}
+            
+            Return ONLY a JSON array: [{{"domain": "...", "type": "Guest Post/Directory/Forum/Comment", "contact_info": "contact@email or URL", "da": 30, "category": "{niche}"}}]"""
+            
+            response = await chat_instance.send_message(UserMessage(content=prompt))
+            
+            new_backlinks = []
+            try:
+                import json, re
+                json_match = re.search(r'\[[\s\S]*\]', response)
+                if json_match:
+                    new_backlinks = json.loads(json_match.group())
+            except:
+                pass
+            
+            # Save new opportunities
+            for bl in new_backlinks:
+                if bl.get("domain") and bl["domain"] not in existing_domains:
+                    backlink_id = str(uuid.uuid4())
+                    await db.niche_backlinks.insert_one({
+                        "id": backlink_id,
+                        "user_id": user_id,
+                        "niche": niche,
+                        "site_id": site_id,
+                        "domain": bl.get("domain", ""),
+                        "type": bl.get("type", "Directory"),
+                        "da": bl.get("da", 30),
+                        "pa": bl.get("pa", 25),
+                        "price": 0,
+                        "is_free": True,
+                        "contact_info": bl.get("contact_info", ""),
+                        "category": bl.get("category", niche),
+                        "auto_discovered": True,
+                        "discovered_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    total_searched += 1
+                    existing_domains.append(bl["domain"])
+            
+            # Step 2: Send up to 15 emails to FREE opportunities
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            emails_sent_today = await db.backlink_outreach.count_documents({
+                "user_id": user_id,
+                "site_id": site_id,
+                "status": "sent",
+                "sent_at": {"$gte": today_start.isoformat()}
+            })
+            
+            remaining_emails = 15 - emails_sent_today
+            if remaining_emails <= 0:
+                logging.info(f"[MANUAL OUTREACH] Site {site_name}: Already sent 15 emails today")
+                continue
+            
+            contacted_domains = await db.backlink_outreach.distinct(
+                "backlink_domain",
+                {"user_id": user_id, "site_id": site_id}
+            )
+            
+            free_opportunities = await db.niche_backlinks.find({
+                "niche": niche,
+                "user_id": user_id,
+                "$or": [{"is_free": True}, {"price": 0}],
+                "domain": {"$nin": contacted_domains}
+            }, {"_id": 0}).to_list(remaining_emails)
+            
+            articles = await db.articles.find(
+                {"user_id": user_id, "site_id": site_id, "status": "published"},
+                {"_id": 0, "id": 1, "title": 1, "wordpress_url": 1}
+            ).sort("created_at", -1).to_list(20)
+            
+            if not articles:
+                articles = [{"id": "placeholder", "title": f"Content on {site_name}", "wordpress_url": site.get("site_url", "")}]
+            
+            for i, opportunity in enumerate(free_opportunities):
+                if total_emails >= remaining_emails:
+                    break
+                
+                article = articles[i % len(articles)]
+                contact_email = opportunity.get("contact_info", "")
+                
+                if not contact_email or "@" not in contact_email:
+                    continue
+                
+                try:
+                    email_chat = LlmChat(api_key=llm_api_key, system_message="You write professional outreach emails.")
+                    email_chat.with_model("openai", "gpt-4o")
+                    
+                    email_body = await email_chat.send_message(UserMessage(content=f"""
+                        Write a short, professional backlink outreach email (max 100 words).
+                        
+                        My site: {site_name}
+                        My article: "{article.get('title')}"
+                        Target site: {opportunity.get('domain')}
+                        
+                        Make it personalized and include a clear call to action.
+                        Return ONLY the email body, no subject.
+                    """))
+                    
+                    subject = f"Collaboration - {article.get('title', 'Guest Post')[:40]}"
+                    
+                    outreach_doc = {
+                        "id": str(uuid.uuid4()),
+                        "user_id": user_id,
+                        "site_id": site_id,
+                        "backlink_domain": opportunity.get("domain"),
+                        "contact_email": contact_email,
+                        "article_id": article.get("id"),
+                        "article_title": article.get("title"),
+                        "article_url": article.get("wordpress_url") or site.get("site_url", ""),
+                        "email_subject": subject,
+                        "email_body": email_body,
+                        "status": "draft",
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    
+                    # Send if Resend is configured
+                    if RESEND_API_KEY and SENDER_EMAIL:
+                        try:
+                            resend.Emails.send({
+                                "from": f"{site_name} <{SENDER_EMAIL}>",
+                                "to": [contact_email],
+                                "subject": subject,
+                                "html": f"<div style='font-family: Arial;'>{email_body.replace(chr(10), '<br>')}</div>"
+                            })
+                            outreach_doc["status"] = "sent"
+                            outreach_doc["sent_at"] = datetime.now(timezone.utc).isoformat()
+                        except Exception as e:
+                            logging.error(f"[MANUAL OUTREACH] Failed to send email: {e}")
+                    
+                    await db.backlink_outreach.insert_one(outreach_doc)
+                    total_emails += 1
+                    
+                except Exception as e:
+                    logging.error(f"[MANUAL OUTREACH] Email generation error: {e}")
+            
+        except Exception as e:
+            logging.error(f"[MANUAL OUTREACH] Site {site_name} error: {e}")
+    
+    return {
+        "success": True,
+        "message": f"Găsite {total_searched} oportunități noi, generate {total_emails} emailuri",
+        "opportunities_found": total_searched,
+        "emails_generated": total_emails
+    }
+
+
 @api_router.get("/backlinks/diagnostic")
 async def backlinks_diagnostic(user: dict = Depends(get_current_user)):
     """Diagnostic endpoint to check why backlinks aren't generated for some sites"""

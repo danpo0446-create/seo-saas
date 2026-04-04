@@ -330,6 +330,44 @@ export default function BacklinksPage() {
     }
   };
 
+  const [sendingAll, setSendingAll] = useState(false);
+  
+  const handleSendAllDrafts = async () => {
+    const drafts = outreachList.filter(o => o.status === 'draft');
+    if (drafts.length === 0) {
+      toast.info('Nu există emailuri draft de trimis');
+      return;
+    }
+    
+    setSendingAll(true);
+    let sent = 0;
+    let errors = 0;
+    
+    for (const draft of drafts) {
+      try {
+        await axios.post(
+          `${API}/backlinks/outreach/${draft.id}/send`,
+          {},
+          { headers: getAuthHeaders() }
+        );
+        sent++;
+      } catch (error) {
+        errors++;
+      }
+    }
+    
+    setSendingAll(false);
+    
+    if (sent > 0) {
+      toast.success(`${sent} emailuri trimise cu succes!`);
+    }
+    if (errors > 0) {
+      toast.error(`${errors} emailuri au eșuat`);
+    }
+    
+    fetchOutreach();
+  };
+
   const handleMarkResponded = async (outreachId, responseType) => {
     try {
       await axios.post(
@@ -828,6 +866,25 @@ export default function BacklinksPage() {
 
         {/* Outreach Tab */}
         <TabsContent value="outreach" className="space-y-4">
+          {/* Send All Drafts Button */}
+          {outreachList.filter(o => o.status === 'draft').length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSendAllDrafts}
+                disabled={sendingAll}
+                className="bg-[#00E676] text-black hover:bg-[#00E676]/90"
+                data-testid="send-all-drafts-btn"
+              >
+                {sendingAll ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                Trimite toate ({outreachList.filter(o => o.status === 'draft').length})
+              </Button>
+            </div>
+          )}
+          
           {outreachList.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="flex flex-col items-center justify-center py-16">
