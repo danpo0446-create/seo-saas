@@ -4743,7 +4743,7 @@ async def test_facebook_post(site_id: str, user: dict = Depends(get_current_user
 @api_router.post("/social/linkedin/test-post/{site_id}")
 async def test_linkedin_post(site_id: str, user: dict = Depends(get_current_user)):
     """Test LinkedIn posting for a site"""
-    from services.social_posting import post_to_linkedin
+    from services.social_posting import post_to_linkedin_personal
     
     site = await db.wordpress_configs.find_one(
         {"id": site_id, "user_id": user["id"]},
@@ -4764,7 +4764,7 @@ async def test_linkedin_post(site_id: str, user: dict = Depends(get_current_user
     
     # Try a test post
     try:
-        result = await post_to_linkedin(
+        result = await post_to_linkedin_personal(
             access_token=linkedin_token,
             person_id=linkedin_person_id,
             text="🔧 Test de postare automată SEO Automation\n\nAcesta este un test pentru verificarea conexiunii LinkedIn. Va fi șters.",
