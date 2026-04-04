@@ -229,6 +229,20 @@ export default function LoginPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Footer */}
+      <footer className="absolute bottom-0 left-0 right-0 py-4 px-4 border-t border-[#262626]">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-2 text-xs">
+          <div className="flex gap-4 text-[#71717A]">
+            <Link to="/terms" className="hover:text-white transition-colors">Termeni</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors">Confidențialitate</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
+          </div>
+          <p className="text-[#71717A]">
+            © {new Date().getFullYear()} SEO Automation
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
