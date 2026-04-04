@@ -4767,10 +4767,9 @@ async def test_linkedin_post(site_id: str, user: dict = Depends(get_current_user
         result = await post_to_linkedin_personal(
             access_token=linkedin_token,
             person_id=linkedin_person_id,
-            text="🔧 Test de postare automată SEO Automation\n\nAcesta este un test pentru verificarea conexiunii LinkedIn. Va fi șters.",
-            article_url=site.get("site_url", "https://example.com"),
-            article_title="Test Conexiune",
-            article_description="Verificare conexiune LinkedIn"
+            title="🔧 Test Conexiune SEO Automation",
+            description="Acesta este un test pentru verificarea conexiunii LinkedIn. Va fi șters.",
+            link=site.get("site_url", "https://example.com")
         )
         
         return {
