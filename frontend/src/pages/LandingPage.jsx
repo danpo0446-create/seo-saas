@@ -400,7 +400,7 @@ const LandingPage = () => {
               <div className="w-8 h-8 rounded-lg bg-[#00E676] flex items-center justify-center">
                 <Zap className="w-5 h-5 text-black" />
               </div>
-              <span className="text-lg font-bold text-white">SEO Automation</span>
+              <span className="text-lg font-bold text-white">SEO Phoenix Martech Assistance</span>
             </div>
             <div className="flex gap-8 text-[#71717A] text-sm">
               <Link to="/terms" className="hover:text-white transition-colors">Termeni și Condiții</Link>
@@ -408,7 +408,7 @@ const LandingPage = () => {
               <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
             </div>
             <div className="text-[#71717A] text-sm">
-              © {new Date().getFullYear()} SEO Automation. Toate drepturile rezervate.
+              © {new Date().getFullYear()} SEO Phoenix Martech Assistance. Toate drepturile rezervate.
             </div>
           </div>
         </div>
