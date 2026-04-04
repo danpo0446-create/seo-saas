@@ -580,6 +580,34 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# ============ HEALTH CHECK ============
+
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and Docker healthcheck"""
+    try:
+        # Test MongoDB connection
+        await db.command("ping")
+        
+        # Get scheduler status
+        scheduler_running = scheduler.running if scheduler else False
+        scheduled_jobs = len(scheduler.get_jobs()) if scheduler and scheduler.running else 0
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "database": "connected",
+            "scheduler": "running" if scheduler_running else "stopped",
+            "scheduled_jobs": scheduled_jobs
+        }
+    except Exception as e:
+        logging.error(f"[HEALTH] Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "error": str(e)
+        }
+
 # ============ AUTH ROUTES ============
 
 @api_router.post("/auth/register", response_model=dict)
@@ -8149,6 +8177,55 @@ async def startup_event():
         replace_existing=True
     )
     logging.info("Scheduled daily missed job recovery at 10:30 AM")
+    
+    # Send startup notification email
+    await send_startup_notification()
+
+async def send_startup_notification():
+    """Send email notification when app starts/restarts"""
+    admin_email = os.environ.get("ADMIN_EMAIL")
+    if not admin_email:
+        logging.warning("[STARTUP] ADMIN_EMAIL not set, skipping startup notification")
+        return
+    
+    try:
+        from saas.email_service import email_service
+        
+        now = datetime.now(ROMANIA_TZ)
+        
+        # Get list of scheduled jobs
+        jobs_list = []
+        for job in scheduler.get_jobs():
+            next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M") if job.next_run_time else "N/A"
+            jobs_list.append(f"• {job.id}: {next_run}")
+        
+        jobs_text = "\n".join(jobs_list) if jobs_list else "No jobs scheduled"
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #22c55e;">✅ SEO SaaS App Started Successfully</h2>
+            <p><strong>Start Time:</strong> {now.strftime("%Y-%m-%d %H:%M:%S")} (Romania)</p>
+            <p><strong>Environment:</strong> Production</p>
+            
+            <h3>Scheduled Jobs:</h3>
+            <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 12px;">
+{jobs_text}
+            </pre>
+            
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">
+                This notification is sent automatically when the application starts or restarts.
+            </p>
+        </div>
+        """
+        
+        await email_service.send_email(
+            to_email=admin_email,
+            subject="✅ SEO SaaS App Started Successfully",
+            html_content=html_content
+        )
+        logging.info(f"[STARTUP] Sent startup notification to {admin_email}")
+    except Exception as e:
+        logging.error(f"[STARTUP] Failed to send startup notification: {e}")
 
 async def reset_monthly_usage():
     """Reset monthly article usage for all subscriptions on 1st of month"""
