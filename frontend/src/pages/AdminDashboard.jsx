@@ -34,12 +34,19 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
+  const [extendedStats, setExtendedStats] = useState(null);
+  const [systemHealth, setSystemHealth] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("stats");
   const usersPerPage = 10;
+
+  // User details modal
+  const [userDetails, setUserDetails] = useState(null);
+  const [showUserDetailsDialog, setShowUserDetailsDialog] = useState(false);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
 
   // Dialog states
   const [selectedUser, setSelectedUser] = useState(null);
@@ -104,12 +111,16 @@ const AdminDashboard = () => {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, extendedRes, healthRes, usersRes] = await Promise.all([
         axios.get(`${API}/admin/stats`, { headers }),
+        axios.get(`${API}/admin/stats/extended`, { headers }),
+        axios.get(`${API}/admin/system/health`, { headers }),
         axios.get(`${API}/admin/users`, { headers })
       ]);
       
       setStats(statsRes.data);
+      setExtendedStats(extendedRes.data);
+      setSystemHealth(healthRes.data);
       setUsers(usersRes.data);
     } catch (error) {
       console.error("Error fetching admin data:", error);
@@ -120,6 +131,22 @@ const AdminDashboard = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserDetails = async (userId) => {
+    setLoadingUserDetails(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const res = await axios.get(`${API}/admin/users/${userId}/full`, { headers });
+      setUserDetails(res.data);
+      setShowUserDetailsDialog(true);
+    } catch (error) {
+      toast.error("Eroare la încărcarea detaliilor utilizatorului");
+    } finally {
+      setLoadingUserDetails(false);
     }
   };
 
@@ -569,6 +596,253 @@ const AdminDashboard = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Extended Stats Section */}
+              {extendedStats && (
+                <>
+                  {/* Registrations */}
+                  <Card className="bg-[#0A0A0A] border-[#262626]">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <Users className="w-5 h-5 text-[#00E676]" />
+                        Înregistrări Noi
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-[#171717] rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold text-[#00E676]">{extendedStats.registrations?.today || 0}</p>
+                          <p className="text-[#71717A] text-sm">Azi</p>
+                        </div>
+                        <div className="bg-[#171717] rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold text-blue-500">{extendedStats.registrations?.this_week || 0}</p>
+                          <p className="text-[#71717A] text-sm">Săptămâna asta</p>
+                        </div>
+                        <div className="bg-[#171717] rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold text-purple-500">{extendedStats.registrations?.this_month || 0}</p>
+                          <p className="text-[#71717A] text-sm">Luna asta</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Revenue & Conversion */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Card className="bg-[#0A0A0A] border-[#262626]">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                          <CreditCard className="w-5 h-5 text-[#00E676]" />
+                          Revenue
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[#71717A]">MRR (Monthly Recurring)</span>
+                            <span className="text-2xl font-bold text-[#00E676]">€{extendedStats.revenue?.mrr || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[#71717A]">ARR (Annual)</span>
+                            <span className="text-xl font-bold text-white">€{extendedStats.revenue?.arr || 0}</span>
+                          </div>
+                          <div className="border-t border-[#262626] pt-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[#71717A]">Conversie Trial</span>
+                              <span className="text-lg font-bold text-blue-500">{extendedStats.revenue?.trial_conversion_rate || 0}%</span>
+                            </div>
+                            <div className="flex justify-between items-center mt-2">
+                              <span className="text-[#71717A]">Churn Rate</span>
+                              <span className="text-lg font-bold text-red-500">{extendedStats.revenue?.churn_rate || 0}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-[#0A0A0A] border-[#262626]">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                          <Mail className="w-5 h-5 text-[#00E676]" />
+                          Backlink Outreach
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[#71717A]">Total Emailuri Trimise</span>
+                            <span className="text-2xl font-bold text-white">{extendedStats.backlinks?.total_sent || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[#71717A]">Răspunsuri Primite</span>
+                            <span className="text-xl font-bold text-[#00E676]">{extendedStats.backlinks?.total_responded || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[#71717A]">Rată Răspuns</span>
+                            <span className="text-lg font-bold text-blue-500">{extendedStats.backlinks?.response_rate || 0}%</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Top Users */}
+                  {extendedStats.top_users?.length > 0 && (
+                    <Card className="bg-[#0A0A0A] border-[#262626]">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-[#00E676]" />
+                          Top 10 Utilizatori Activi
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {extendedStats.top_users.map((user, index) => (
+                            <div 
+                              key={user.user_id} 
+                              className="flex items-center justify-between p-3 bg-[#171717] rounded-lg cursor-pointer hover:bg-[#262626]"
+                              onClick={() => fetchUserDetails(user.user_id)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-[#71717A] w-6">{index + 1}.</span>
+                                <div>
+                                  <p className="text-white font-medium">{user.name || user.email}</p>
+                                  <p className="text-[#71717A] text-sm">{user.email}</p>
+                                </div>
+                              </div>
+                              <Badge className="bg-[#00E676]/10 text-[#00E676]">
+                                {user.articles_count} articole
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Usage by Plan */}
+                  {extendedStats.usage_by_plan && (
+                    <Card className="bg-[#0A0A0A] border-[#262626]">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                          <Activity className="w-5 h-5 text-[#00E676]" />
+                          Utilizare per Plan
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {Object.entries(extendedStats.usage_by_plan).map(([plan, data]) => (
+                            <div key={plan} className="bg-[#171717] rounded-lg p-4">
+                              <p className="text-white font-bold capitalize text-lg">{plan}</p>
+                              <div className="mt-2 space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-[#71717A]">Utilizatori</span>
+                                  <span className="text-white">{data.users}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-[#71717A]">Articole</span>
+                                  <span className="text-white">{data.articles}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-[#71717A]">Site-uri</span>
+                                  <span className="text-white">{data.sites}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* User Growth Chart */}
+                  {extendedStats.user_growth_chart?.length > 0 && (
+                    <Card className="bg-[#0A0A0A] border-[#262626]">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-[#00E676]" />
+                          Creștere Utilizatori (30 zile)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-end justify-between gap-1 h-32">
+                          {extendedStats.user_growth_chart.slice(-30).map((day) => {
+                            const maxReg = Math.max(...extendedStats.user_growth_chart.map(d => d.registrations), 1);
+                            const height = (day.registrations / maxReg) * 100;
+                            return (
+                              <div 
+                                key={day.date} 
+                                className="flex-1 bg-[#00E676]/80 rounded-t min-h-[4px] hover:bg-[#00E676] transition-colors"
+                                style={{ height: `${Math.max(height, 4)}%` }}
+                                title={`${day.date}: ${day.registrations} înregistrări`}
+                              ></div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-[#71717A]">
+                          <span>{extendedStats.user_growth_chart[0]?.date}</span>
+                          <span>{extendedStats.user_growth_chart[extendedStats.user_growth_chart.length - 1]?.date}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {/* System Health */}
+              {systemHealth && (
+                <Card className="bg-[#0A0A0A] border-[#262626]">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                      System Health
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <div className="bg-[#171717] rounded-lg p-4 text-center">
+                        <p className={`text-2xl font-bold ${systemHealth.users_missing_api_keys_count > 0 ? 'text-yellow-500' : 'text-[#00E676]'}`}>
+                          {systemHealth.users_missing_api_keys_count || 0}
+                        </p>
+                        <p className="text-[#71717A] text-sm">Utilizatori fără API Keys</p>
+                      </div>
+                      <div className="bg-[#171717] rounded-lg p-4 text-center">
+                        <p className={`text-2xl font-bold ${systemHealth.failed_jobs_today > 0 ? 'text-red-500' : 'text-[#00E676]'}`}>
+                          {systemHealth.failed_jobs_today || 0}
+                        </p>
+                        <p className="text-[#71717A] text-sm">Job-uri Eșuate Azi</p>
+                      </div>
+                      <div className="bg-[#171717] rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-yellow-500">{systemHealth.expired_trials_not_converted || 0}</p>
+                        <p className="text-[#71717A] text-sm">Trial-uri Expirate</p>
+                      </div>
+                      <div className="bg-[#171717] rounded-lg p-4 text-center">
+                        <p className={`text-2xl font-bold ${systemHealth.sites_without_niche > 0 ? 'text-yellow-500' : 'text-[#00E676]'}`}>
+                          {systemHealth.sites_without_niche || 0}
+                        </p>
+                        <p className="text-[#71717A] text-sm">Site-uri fără Nișă</p>
+                      </div>
+                    </div>
+                    
+                    {systemHealth.users_missing_api_keys?.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-[#71717A] text-sm mb-2">Utilizatori care necesită configurare API Keys:</p>
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {systemHealth.users_missing_api_keys.slice(0, 10).map((user) => (
+                            <div 
+                              key={user.user_id} 
+                              className="flex items-center justify-between p-2 bg-[#171717] rounded text-sm cursor-pointer hover:bg-[#262626]"
+                              onClick={() => fetchUserDetails(user.user_id)}
+                            >
+                              <span className="text-white">{user.email}</span>
+                              <Badge variant="outline" className="text-yellow-500 border-yellow-500">Lipsă LLM Key</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </>
           )}
         </TabsContent>
@@ -632,6 +906,16 @@ const AdminDashboard = () => {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => fetchUserDetails(user.id)}
+                              className="text-[#00E676] hover:text-[#00E676]/80 hover:bg-[#00E676]/10"
+                              title="Vezi Detalii"
+                              data-testid={`view-user-${user.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1314,6 +1598,184 @@ const AdminDashboard = () => {
               {actionLoading ? "Se resetează..." : "Resetează Parola"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Details Dialog */}
+      <Dialog open={showUserDetailsDialog} onOpenChange={setShowUserDetailsDialog}>
+        <DialogContent className="bg-[#0A0A0A] border-[#262626] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-[#00E676]" />
+              Detalii Utilizator
+            </DialogTitle>
+          </DialogHeader>
+          
+          {loadingUserDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#00E676]"></div>
+            </div>
+          ) : userDetails ? (
+            <div className="space-y-6">
+              {/* User Info */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-[#171717] rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-white mb-3">Informații Cont</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Nume</span>
+                      <span className="text-white">{userDetails.user?.name || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Email</span>
+                      <span className="text-white">{userDetails.user?.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Rol</span>
+                      <Badge className={userDetails.user?.role === 'admin' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'}>
+                        {userDetails.user?.role || 'user'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Înregistrat</span>
+                      <span className="text-white">{userDetails.user?.created_at ? new Date(userDetails.user.created_at).toLocaleDateString('ro-RO') : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Ultima activitate</span>
+                      <span className="text-white">{userDetails.last_activity ? new Date(userDetails.last_activity).toLocaleDateString('ro-RO') : 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#171717] rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-white mb-3">Abonament</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Plan</span>
+                      <Badge className="bg-[#00E676]/10 text-[#00E676] capitalize">{userDetails.subscription?.plan || 'free'}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Status</span>
+                      <Badge className={
+                        userDetails.subscription?.status === 'active' ? 'bg-[#00E676]/10 text-[#00E676]' :
+                        userDetails.subscription?.status === 'trialing' ? 'bg-yellow-500/10 text-yellow-500' :
+                        'bg-red-500/10 text-red-500'
+                      }>
+                        {userDetails.subscription?.status || 'expired'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Limită articole</span>
+                      <span className="text-white">{userDetails.subscription?.articles_limit || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#71717A]">Limită site-uri</span>
+                      <span className="text-white">{userDetails.subscription?.sites_limit || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-[#171717] rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-[#00E676]">{userDetails.stats?.total_articles || 0}</p>
+                  <p className="text-[#71717A] text-xs">Total Articole</p>
+                </div>
+                <div className="bg-[#171717] rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-blue-500">{userDetails.stats?.articles_this_month || 0}</p>
+                  <p className="text-[#71717A] text-xs">Articole Luna</p>
+                </div>
+                <div className="bg-[#171717] rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-purple-500">{userDetails.stats?.published_articles || 0}</p>
+                  <p className="text-[#71717A] text-xs">Publicate</p>
+                </div>
+                <div className="bg-[#171717] rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-yellow-500">{userDetails.stats?.outreach_sent || 0}</p>
+                  <p className="text-[#71717A] text-xs">Emailuri Trimise</p>
+                </div>
+                <div className="bg-[#171717] rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-pink-500">{userDetails.stats?.outreach_responded || 0}</p>
+                  <p className="text-[#71717A] text-xs">Răspunsuri</p>
+                </div>
+              </div>
+
+              {/* API Keys Status */}
+              <div className="bg-[#171717] rounded-lg p-4">
+                <h3 className="text-lg font-bold text-white mb-3">Chei API Configurate</h3>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(userDetails.api_keys_status || {}).map(([key, configured]) => (
+                    <Badge 
+                      key={key} 
+                      className={configured ? 'bg-[#00E676]/10 text-[#00E676]' : 'bg-red-500/10 text-red-500'}
+                    >
+                      {configured ? <CheckCircle className="w-3 h-3 mr-1" /> : <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {key.toUpperCase()}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sites */}
+              {userDetails.sites?.length > 0 && (
+                <div className="bg-[#171717] rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-white mb-3">Site-uri WordPress ({userDetails.sites.length})</h3>
+                  <div className="space-y-2">
+                    {userDetails.sites.map((site) => (
+                      <div key={site.id} className="flex items-center justify-between p-2 bg-[#0A0A0A] rounded">
+                        <div>
+                          <p className="text-white">{site.site_name || site.site_url}</p>
+                          <p className="text-[#71717A] text-xs">{site.niche || 'Fără nișă'}</p>
+                        </div>
+                        <Badge variant="outline" className="text-[#71717A]">{site.site_url}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* GSC Connections */}
+              {userDetails.gsc_connections?.length > 0 && (
+                <div className="bg-[#171717] rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-white mb-3">Google Search Console ({userDetails.gsc_connections.length})</h3>
+                  <div className="space-y-2">
+                    {userDetails.gsc_connections.map((gsc, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-[#0A0A0A] rounded">
+                        <span className="text-white">{gsc.site_url || gsc.property}</span>
+                        <Badge className="bg-[#00E676]/10 text-[#00E676]">Conectat</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Articles */}
+              {userDetails.recent_articles?.length > 0 && (
+                <div className="bg-[#171717] rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-white mb-3">Articole Recente</h3>
+                  <div className="space-y-2">
+                    {userDetails.recent_articles.map((article) => (
+                      <div key={article.id} className="flex items-center justify-between p-2 bg-[#0A0A0A] rounded">
+                        <div className="flex-1 truncate">
+                          <p className="text-white truncate">{article.title}</p>
+                          <p className="text-[#71717A] text-xs">{article.created_at ? new Date(article.created_at).toLocaleDateString('ro-RO') : ''}</p>
+                        </div>
+                        <Badge className={
+                          article.status === 'published' ? 'bg-[#00E676]/10 text-[#00E676]' :
+                          article.status === 'draft' ? 'bg-yellow-500/10 text-yellow-500' :
+                          'bg-blue-500/10 text-blue-500'
+                        }>
+                          {article.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-[#71717A] text-center py-4">Nu s-au găsit date</p>
+          )}
         </DialogContent>
       </Dialog>
     </div>

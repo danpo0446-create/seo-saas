@@ -548,3 +548,286 @@ async def admin_reset_user_password(user_id: str, data: ResetUserPasswordRequest
     ))
     
     return {"message": f"Parola pentru {user.get('email')} a fost resetată cu succes"}
+
+
+# ============ EXTENDED STATISTICS ============
+
+@admin_router.get("/stats/extended")
+async def get_extended_stats(admin: dict = Depends(get_admin_user)):
+    """Get extended platform statistics for admin dashboard"""
+    db = get_db()
+    
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+    
+    # User registrations
+    new_today = await db.users.count_documents({"created_at": {"$gte": today.isoformat()}})
+    new_this_week = await db.users.count_documents({"created_at": {"$gte": week_ago.isoformat()}})
+    new_this_month = await db.users.count_documents({"created_at": {"$gte": month_ago.isoformat()}})
+    
+    # User growth chart (last 30 days)
+    user_growth = []
+    for i in range(30):
+        day = today - timedelta(days=i)
+        day_end = day + timedelta(days=1)
+        count = await db.users.count_documents({
+            "created_at": {"$gte": day.isoformat(), "$lt": day_end.isoformat()}
+        })
+        user_growth.append({"date": day.strftime("%Y-%m-%d"), "registrations": count})
+    user_growth.reverse()
+    
+    # Total articles this month
+    articles_this_month = await db.articles.count_documents({
+        "created_at": {"$gte": month_ago.isoformat()}
+    })
+    
+    # Total backlink emails sent
+    total_outreach_sent = await db.backlink_outreach.count_documents({"status": "sent"})
+    total_outreach_responded = await db.backlink_outreach.count_documents({"status": "responded"})
+    
+    # Top 10 most active users
+    pipeline = [
+        {"$group": {"_id": "$user_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    top_users_by_articles = await db.articles.aggregate(pipeline).to_list(10)
+    
+    # Enrich with user names
+    top_users = []
+    for item in top_users_by_articles:
+        user = await db.users.find_one({"id": item["_id"]}, {"_id": 0, "email": 1, "name": 1})
+        if user:
+            top_users.append({
+                "user_id": item["_id"],
+                "email": user.get("email", "Unknown"),
+                "name": user.get("name", ""),
+                "articles_count": item["count"]
+            })
+    
+    # Usage by plan
+    usage_by_plan = {}
+    for plan in ["starter", "pro", "agency", "enterprise"]:
+        subs = await db.subscriptions.find({"plan": plan, "status": {"$in": ["active", "trialing"]}}).to_list(1000)
+        user_ids = [s["user_id"] for s in subs]
+        articles = await db.articles.count_documents({"user_id": {"$in": user_ids}}) if user_ids else 0
+        sites = await db.wordpress_configs.count_documents({"user_id": {"$in": user_ids}}) if user_ids else 0
+        usage_by_plan[plan] = {
+            "users": len(subs),
+            "articles": articles,
+            "sites": sites
+        }
+    
+    # Revenue stats
+    plan_prices = {"starter": 19, "pro": 49, "agency": 99, "enterprise": 199}
+    annual_discount = 0.8  # 20% discount
+    
+    mrr = 0
+    arr = 0
+    
+    paid_subs = await db.subscriptions.find(
+        {"status": "active"},
+        {"plan": 1, "billing_interval": 1, "_id": 0}
+    ).to_list(1000)
+    
+    for sub in paid_subs:
+        plan = sub.get("plan", "starter")
+        price = plan_prices.get(plan, 0)
+        is_annual = sub.get("billing_interval") == "year"
+        
+        if is_annual:
+            monthly_equivalent = (price * 12 * annual_discount) / 12
+            mrr += monthly_equivalent
+        else:
+            mrr += price
+    
+    arr = mrr * 12
+    
+    # Trial conversion rate
+    total_trials_started = await db.subscriptions.count_documents({"trial_ends_at": {"$exists": True}})
+    converted_trials = await db.subscriptions.count_documents({
+        "trial_ends_at": {"$exists": True},
+        "status": "active"
+    })
+    trial_conversion_rate = round((converted_trials / total_trials_started * 100), 1) if total_trials_started > 0 else 0
+    
+    # Churn (cancelled in last 30 days)
+    churned = await db.subscriptions.count_documents({
+        "status": "canceled",
+        "updated_at": {"$gte": month_ago.isoformat()}
+    })
+    active_start_of_month = await db.subscriptions.count_documents({
+        "status": {"$in": ["active", "canceled"]},
+        "created_at": {"$lt": month_ago.isoformat()}
+    })
+    churn_rate = round((churned / active_start_of_month * 100), 1) if active_start_of_month > 0 else 0
+    
+    return {
+        "registrations": {
+            "today": new_today,
+            "this_week": new_this_week,
+            "this_month": new_this_month
+        },
+        "user_growth_chart": user_growth,
+        "articles_this_month": articles_this_month,
+        "backlinks": {
+            "total_sent": total_outreach_sent,
+            "total_responded": total_outreach_responded,
+            "response_rate": round((total_outreach_responded / total_outreach_sent * 100), 1) if total_outreach_sent > 0 else 0
+        },
+        "top_users": top_users,
+        "usage_by_plan": usage_by_plan,
+        "revenue": {
+            "mrr": round(mrr, 2),
+            "arr": round(arr, 2),
+            "trial_conversion_rate": trial_conversion_rate,
+            "churn_rate": churn_rate
+        }
+    }
+
+
+@admin_router.get("/users/{user_id}/full")
+async def get_user_full_details(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Get complete details for a specific user including API keys status, GSC, etc."""
+    db = get_db()
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Subscription
+    sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+    
+    # Sites
+    sites = await db.wordpress_configs.find(
+        {"user_id": user_id},
+        {"_id": 0, "app_password": 0}
+    ).to_list(100)
+    
+    # GSC connections
+    gsc_connections = await db.gsc_connections.find(
+        {"user_id": user_id},
+        {"_id": 0, "access_token": 0, "refresh_token": 0}
+    ).to_list(100)
+    
+    # API Keys status (don't expose actual keys)
+    api_keys_doc = await db.user_api_keys.find_one({"user_id": user_id}, {"_id": 0})
+    api_keys_status = {
+        "openai": bool(api_keys_doc.get("openai_key")) if api_keys_doc else False,
+        "gemini": bool(api_keys_doc.get("gemini_key")) if api_keys_doc else False,
+        "resend": bool(api_keys_doc.get("resend_key")) if api_keys_doc else False,
+        "sendgrid": bool(api_keys_doc.get("sendgrid_key")) if api_keys_doc else False,
+        "pexels": bool(api_keys_doc.get("pexels_key")) if api_keys_doc else False,
+        "facebook": bool(api_keys_doc.get("facebook_app_id")) if api_keys_doc else False,
+        "linkedin": bool(api_keys_doc.get("linkedin_client_id")) if api_keys_doc else False
+    }
+    
+    # Articles stats
+    total_articles = await db.articles.count_documents({"user_id": user_id})
+    month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    articles_this_month = await db.articles.count_documents({
+        "user_id": user_id,
+        "created_at": {"$gte": month_ago.isoformat()}
+    })
+    published_articles = await db.articles.count_documents({"user_id": user_id, "status": "published"})
+    
+    # Backlink stats
+    outreach_sent = await db.backlink_outreach.count_documents({"user_id": user_id, "status": "sent"})
+    outreach_responded = await db.backlink_outreach.count_documents({"user_id": user_id, "status": "responded"})
+    
+    # Last activity
+    last_article = await db.articles.find_one(
+        {"user_id": user_id},
+        {"_id": 0, "created_at": 1}
+    ).sort("created_at", -1)
+    
+    last_login = user.get("last_login")
+    last_activity = last_article.get("created_at") if last_article else last_login
+    
+    # Recent articles
+    recent_articles = await db.articles.find(
+        {"user_id": user_id},
+        {"_id": 0, "content": 0}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    # Payments
+    payments = await db.payment_transactions.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(10).to_list(10)
+    
+    # Invoices
+    invoices = await db.invoices.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(10).to_list(10)
+    
+    return {
+        "user": user,
+        "subscription": sub,
+        "sites": sites,
+        "gsc_connections": gsc_connections,
+        "api_keys_status": api_keys_status,
+        "stats": {
+            "total_articles": total_articles,
+            "articles_this_month": articles_this_month,
+            "published_articles": published_articles,
+            "outreach_sent": outreach_sent,
+            "outreach_responded": outreach_responded
+        },
+        "last_activity": last_activity,
+        "recent_articles": recent_articles,
+        "payments": payments,
+        "invoices": invoices
+    }
+
+
+@admin_router.get("/system/health")
+async def get_system_health(admin: dict = Depends(get_admin_user)):
+    """Get system health status"""
+    db = get_db()
+    
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Users with missing API keys (have sites but no LLM key)
+    users_with_sites = await db.wordpress_configs.distinct("user_id")
+    users_missing_keys = []
+    
+    for uid in users_with_sites[:100]:  # Limit to 100
+        api_keys = await db.user_api_keys.find_one({"user_id": uid})
+        has_llm = api_keys and (api_keys.get("openai_key") or api_keys.get("gemini_key"))
+        if not has_llm:
+            user = await db.users.find_one({"id": uid}, {"_id": 0, "email": 1, "name": 1})
+            if user:
+                users_missing_keys.append({
+                    "user_id": uid,
+                    "email": user.get("email"),
+                    "name": user.get("name")
+                })
+    
+    # Failed jobs today (check notifications)
+    failed_jobs = await db.notifications.count_documents({
+        "type": "error",
+        "created_at": {"$gte": today.isoformat()}
+    })
+    
+    # Expired trials not converted
+    expired_trials = await db.subscriptions.count_documents({
+        "status": "expired",
+        "trial_ends_at": {"$lt": datetime.now(timezone.utc).isoformat()}
+    })
+    
+    # Sites without niche configured
+    sites_no_niche = await db.wordpress_configs.count_documents({
+        "$or": [{"niche": {"$exists": False}}, {"niche": ""}, {"niche": None}]
+    })
+    
+    return {
+        "users_missing_api_keys": users_missing_keys[:20],
+        "users_missing_api_keys_count": len(users_missing_keys),
+        "failed_jobs_today": failed_jobs,
+        "expired_trials_not_converted": expired_trials,
+        "sites_without_niche": sites_no_niche
+    }
+
