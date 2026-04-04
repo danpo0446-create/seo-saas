@@ -13,16 +13,51 @@ import hashlib
 
 from .plans import PLANS, TRIAL_CONFIG, get_plan
 
-# API Key encryption/decryption - DISABLED for simplicity
-# Keys are stored in plain text
+# API Key encryption/decryption using Fernet
+# Derives key from JWT_SECRET for consistency
+
+def _get_fernet():
+    """Get Fernet cipher using JWT_SECRET as the encryption key"""
+    jwt_secret = os.environ.get('JWT_SECRET', 'seo-automation-secret-key-2024')
+    key = base64.urlsafe_b64encode(hashlib.sha256(jwt_secret.encode()).digest())
+    return Fernet(key)
 
 def encrypt_api_key(key: str) -> str:
-    """Store API key as-is (no encryption for simplicity)"""
-    return key if key else ""
+    """Encrypt API key using Fernet"""
+    if not key:
+        return ""
+    try:
+        fernet = _get_fernet()
+        return fernet.encrypt(key.encode()).decode()
+    except Exception as e:
+        logging.error(f"[BYOAK] Encryption error: {e}")
+        return key  # Return plain if encryption fails
 
 def decrypt_api_key(encrypted_key: str) -> str:
-    """Return API key as-is (no decryption needed)"""
-    return encrypted_key if encrypted_key else ""
+    """Decrypt API key. Handles both encrypted (Fernet) and plain text keys."""
+    if not encrypted_key:
+        return ""
+    
+    # Check if key is already plain text (not encrypted)
+    # OpenAI keys start with sk-, Resend with re_, etc.
+    plain_prefixes = ['sk-', 're_', 'SG.', 'AIza']
+    for prefix in plain_prefixes:
+        if encrypted_key.startswith(prefix):
+            logging.debug(f"[BYOAK] Key is already plain text (starts with {prefix})")
+            return encrypted_key
+    
+    # Check if it looks like a Fernet token (starts with gAAAAAB)
+    if encrypted_key.startswith('gAAAAAB'):
+        try:
+            fernet = _get_fernet()
+            return fernet.decrypt(encrypted_key.encode()).decode()
+        except Exception as e:
+            logging.warning(f"[BYOAK] Fernet decryption failed: {e}. Key may have been encrypted with different secret.")
+            # Return empty to force user to re-enter key
+            return ""
+    
+    # Unknown format - return as-is (could be a key without standard prefix)
+    return encrypted_key
 
 class SubscriptionService:
     def __init__(self, db: AsyncIOMotorDatabase):

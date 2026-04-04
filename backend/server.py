@@ -68,22 +68,36 @@ async def get_user_llm_key(user_id: str, is_admin: bool = False, user_email: str
     user_keys = await db.user_api_keys.find_one({"user_id": user_id})
     
     if user_keys:
+        # Try OpenAI key first
         if user_keys.get("openai_key"):
-            decrypted_key = decrypt_api_key(user_keys["openai_key"])
+            raw_key = user_keys["openai_key"]
+            decrypted_key = decrypt_api_key(raw_key)
             if decrypted_key and decrypted_key.startswith("sk-"):
+                logging.info(f"[LLM] User {user_id[:8]}... using OpenAI key")
                 return decrypted_key, "openai", "gpt-4o"
+            elif raw_key:
+                # Key exists but couldn't be decrypted - likely encrypted with old secret
+                logging.warning(f"[LLM] User {user_id[:8]}... OpenAI key exists but decryption failed. User must re-save key.")
+        
+        # Try Gemini key
         if user_keys.get("gemini_key"):
-            decrypted_key = decrypt_api_key(user_keys["gemini_key"])
+            raw_key = user_keys["gemini_key"]
+            decrypted_key = decrypt_api_key(raw_key)
             if decrypted_key:
+                logging.info(f"[LLM] User {user_id[:8]}... using Gemini key")
                 return decrypted_key, "gemini", "gemini-2.0-flash"
+            elif raw_key:
+                logging.warning(f"[LLM] User {user_id[:8]}... Gemini key exists but decryption failed. User must re-save key.")
     
     # Fallback to platform key ONLY for admin or test users
     is_test_user = "test" in user_email.lower() if user_email else False
     if is_admin or is_test_user:
         platform_key = os.environ.get('EMERGENT_LLM_KEY')
         if platform_key:
+            logging.info(f"[LLM] Using platform fallback key for admin/test user")
             return platform_key, "openai", "gpt-4o"
     
+    logging.warning(f"[LLM] No valid API key found for user {user_id[:8]}...")
     return None, None, None
 
 # Helper function to get user's email API key (Resend or SendGrid)
