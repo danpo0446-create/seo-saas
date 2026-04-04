@@ -2197,12 +2197,19 @@ async def get_outreach_stats(user: dict = Depends(get_current_user)):
 # ============ BACKLINK AUTOMATION STATUS ============
 
 @api_router.get("/backlinks/automation-status")
-async def get_backlink_automation_status(user: dict = Depends(get_current_user)):
-    """Get backlink automation status for all sites"""
+async def get_backlink_automation_status(
+    site_id: str = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get backlink automation status. If site_id provided, returns only that site's status."""
     
     # Get user's sites
+    site_filter = {"user_id": user["id"]}
+    if site_id:
+        site_filter["id"] = site_id
+    
     sites = await db.wordpress_configs.find(
-        {"user_id": user["id"]},
+        site_filter,
         {"_id": 0, "id": 1, "site_name": 1, "site_url": 1, "niche": 1}
     ).to_list(100)
     
@@ -2307,11 +2314,19 @@ async def get_backlink_automation_status(user: dict = Depends(get_current_user))
 
 
 @api_router.get("/backlinks/outreach/detailed-stats")
-async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
-    """Get detailed outreach statistics with charts data"""
+async def get_detailed_outreach_stats(
+    site_id: str = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get detailed outreach statistics with charts data. Optionally filter by site_id."""
     
     user_id = user["id"]
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Base filter - always include user_id
+    base_filter = {"user_id": user_id}
+    if site_id:
+        base_filter["site_id"] = site_id
     
     # Daily stats for last 30 days
     daily_stats = []
@@ -2319,17 +2334,11 @@ async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
         day_start = today - timedelta(days=i)
         day_end = day_start + timedelta(days=1)
         
-        sent = await db.backlink_outreach.count_documents({
-            "user_id": user_id,
-            "status": "sent",
-            "sent_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
-        })
+        sent_filter = {**base_filter, "status": "sent", "sent_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}}
+        sent = await db.backlink_outreach.count_documents(sent_filter)
         
-        responded = await db.backlink_outreach.count_documents({
-            "user_id": user_id,
-            "status": "responded",
-            "updated_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
-        })
+        responded_filter = {**base_filter, "status": "responded", "updated_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}}
+        responded = await db.backlink_outreach.count_documents(responded_filter)
         
         daily_stats.append({
             "date": day_start.strftime("%Y-%m-%d"),
@@ -2340,25 +2349,17 @@ async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
     daily_stats.reverse()  # Oldest first
     
     # Overall statistics
-    total_sent = await db.backlink_outreach.count_documents({
-        "user_id": user_id, "status": "sent"
-    })
-    total_responded = await db.backlink_outreach.count_documents({
-        "user_id": user_id, "status": "responded"
-    })
-    total_drafts = await db.backlink_outreach.count_documents({
-        "user_id": user_id, "status": "draft"
-    })
-    total_pending = await db.backlink_outreach.count_documents({
-        "user_id": user_id, "status": "pending_approval"
-    })
+    total_sent = await db.backlink_outreach.count_documents({**base_filter, "status": "sent"})
+    total_responded = await db.backlink_outreach.count_documents({**base_filter, "status": "responded"})
+    total_drafts = await db.backlink_outreach.count_documents({**base_filter, "status": "draft"})
+    total_pending = await db.backlink_outreach.count_documents({**base_filter, "status": "pending_approval"})
     
     # Response rate
     response_rate = round((total_responded / total_sent * 100), 1) if total_sent > 0 else 0
     
     # Conversion stats (responded with positive response)
     conversions = await db.backlink_outreach.count_documents({
-        "user_id": user_id,
+        **base_filter,
         "status": "responded",
         "response_type": "positive"
     })
@@ -2366,7 +2367,7 @@ async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
     
     # Top performing domains (most responses)
     pipeline = [
-        {"$match": {"user_id": user_id, "status": "responded"}},
+        {"$match": {**base_filter, "status": "responded"}},
         {"$group": {"_id": "$backlink_domain", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 5}
@@ -2378,13 +2379,13 @@ async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
     last_week_start = this_week_start - timedelta(days=7)
     
     this_week_sent = await db.backlink_outreach.count_documents({
-        "user_id": user_id,
+        **base_filter,
         "status": "sent",
         "sent_at": {"$gte": this_week_start.isoformat()}
     })
     
     last_week_sent = await db.backlink_outreach.count_documents({
-        "user_id": user_id,
+        **base_filter,
         "status": "sent",
         "sent_at": {"$gte": last_week_start.isoformat(), "$lt": this_week_start.isoformat()}
     })
@@ -2407,7 +2408,8 @@ async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
             "this_week": this_week_sent,
             "last_week": last_week_sent,
             "change_percent": week_change
-        }
+        },
+        "filtered_by_site": site_id
     }
 
 
@@ -2698,8 +2700,11 @@ async def trigger_backlink_search(user: dict = Depends(get_current_user)):
 
 
 @api_router.post("/backlinks/trigger-outreach")
-async def trigger_backlink_outreach(user: dict = Depends(get_current_user)):
-    """Manually trigger backlink outreach automation for current user's sites"""
+async def trigger_backlink_outreach(
+    site_id: str = None,
+    user: dict = Depends(get_current_user)
+):
+    """Manually trigger backlink outreach automation. If site_id provided, only process that site."""
     import asyncio
     
     user_id = user["id"]
@@ -2710,9 +2715,13 @@ async def trigger_backlink_outreach(user: dict = Depends(get_current_user)):
     if not llm_api_key:
         raise HTTPException(status_code=500, detail="LLM nu este configurat. Adaugă EMERGENT_LLM_KEY în .env")
     
-    # Get user's sites
+    # Get user's sites - filter by site_id if provided
+    site_filter = {"user_id": user_id}
+    if site_id:
+        site_filter["id"] = site_id
+    
     sites = await db.wordpress_configs.find(
-        {"user_id": user_id},
+        site_filter,
         {"_id": 0, "id": 1, "site_url": 1, "site_name": 1, "niche": 1}
     ).to_list(100)
     
