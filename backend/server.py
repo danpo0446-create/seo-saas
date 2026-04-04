@@ -2306,6 +2306,111 @@ async def get_backlink_automation_status(user: dict = Depends(get_current_user))
     }
 
 
+@api_router.get("/backlinks/outreach/detailed-stats")
+async def get_detailed_outreach_stats(user: dict = Depends(get_current_user)):
+    """Get detailed outreach statistics with charts data"""
+    
+    user_id = user["id"]
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Daily stats for last 30 days
+    daily_stats = []
+    for i in range(30):
+        day_start = today - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        
+        sent = await db.backlink_outreach.count_documents({
+            "user_id": user_id,
+            "status": "sent",
+            "sent_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
+        })
+        
+        responded = await db.backlink_outreach.count_documents({
+            "user_id": user_id,
+            "status": "responded",
+            "updated_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
+        })
+        
+        daily_stats.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "sent": sent,
+            "responded": responded
+        })
+    
+    daily_stats.reverse()  # Oldest first
+    
+    # Overall statistics
+    total_sent = await db.backlink_outreach.count_documents({
+        "user_id": user_id, "status": "sent"
+    })
+    total_responded = await db.backlink_outreach.count_documents({
+        "user_id": user_id, "status": "responded"
+    })
+    total_drafts = await db.backlink_outreach.count_documents({
+        "user_id": user_id, "status": "draft"
+    })
+    total_pending = await db.backlink_outreach.count_documents({
+        "user_id": user_id, "status": "pending_approval"
+    })
+    
+    # Response rate
+    response_rate = round((total_responded / total_sent * 100), 1) if total_sent > 0 else 0
+    
+    # Conversion stats (responded with positive response)
+    conversions = await db.backlink_outreach.count_documents({
+        "user_id": user_id,
+        "status": "responded",
+        "response_type": "positive"
+    })
+    conversion_rate = round((conversions / total_responded * 100), 1) if total_responded > 0 else 0
+    
+    # Top performing domains (most responses)
+    pipeline = [
+        {"$match": {"user_id": user_id, "status": "responded"}},
+        {"$group": {"_id": "$backlink_domain", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    top_domains = await db.backlink_outreach.aggregate(pipeline).to_list(5)
+    
+    # Weekly comparison
+    this_week_start = today - timedelta(days=today.weekday())
+    last_week_start = this_week_start - timedelta(days=7)
+    
+    this_week_sent = await db.backlink_outreach.count_documents({
+        "user_id": user_id,
+        "status": "sent",
+        "sent_at": {"$gte": this_week_start.isoformat()}
+    })
+    
+    last_week_sent = await db.backlink_outreach.count_documents({
+        "user_id": user_id,
+        "status": "sent",
+        "sent_at": {"$gte": last_week_start.isoformat(), "$lt": this_week_start.isoformat()}
+    })
+    
+    week_change = round(((this_week_sent - last_week_sent) / last_week_sent * 100), 1) if last_week_sent > 0 else 0
+    
+    return {
+        "overview": {
+            "total_sent": total_sent,
+            "total_responded": total_responded,
+            "total_drafts": total_drafts,
+            "total_pending": total_pending,
+            "response_rate": response_rate,
+            "conversions": conversions,
+            "conversion_rate": conversion_rate
+        },
+        "daily_stats": daily_stats,
+        "top_domains": [{"domain": d["_id"], "responses": d["count"]} for d in top_domains],
+        "weekly_comparison": {
+            "this_week": this_week_sent,
+            "last_week": last_week_sent,
+            "change_percent": week_change
+        }
+    }
+
+
 # ============ WEB 2.0 BACKLINK SYSTEM ============
 
 class Web2Config(BaseModel):
