@@ -736,11 +736,13 @@ async def get_user_full_details(user_id: str, admin: dict = Depends(get_admin_us
     outreach_sent = await db.backlink_outreach.count_documents({"user_id": user_id, "status": "sent"})
     outreach_responded = await db.backlink_outreach.count_documents({"user_id": user_id, "status": "responded"})
     
-    # Last activity
-    last_article = await db.articles.find_one(
+    # Last activity - use find().sort().limit() instead of find_one().sort()
+    last_article_cursor = db.articles.find(
         {"user_id": user_id},
         {"_id": 0, "created_at": 1}
-    ).sort("created_at", -1)
+    ).sort("created_at", -1).limit(1)
+    last_article_list = await last_article_cursor.to_list(1)
+    last_article = last_article_list[0] if last_article_list else None
     
     last_login = user.get("last_login")
     last_activity = last_article.get("created_at") if last_article else last_login
