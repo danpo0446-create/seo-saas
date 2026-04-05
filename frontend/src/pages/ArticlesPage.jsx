@@ -535,9 +535,10 @@ export default function ArticlesPage() {
                   ))}
                 </div>
                 <div className="prose prose-invert max-w-none">
-                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-                    {selectedArticle?.content}
-                  </div>
+                  <div 
+                    className="text-foreground leading-relaxed article-content"
+                    dangerouslySetInnerHTML={{ __html: selectedArticle?.content || '' }}
+                  />
                 </div>
               </div>
             )}
