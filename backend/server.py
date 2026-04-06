@@ -2130,15 +2130,19 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
     if not pending:
         return {"success": True, "sent": 0, "message": "No pending emails"}
     
-    if not RESEND_API_KEY:
-        raise HTTPException(status_code=500, detail="Email service not configured")
-    
+    # Get user's email API key (BYOAK)
     user_doc = await db.users.find_one({"id": user["id"]}, {"_id": 0})
     sender_name = user_doc.get('name', 'SEO Team') if user_doc else 'SEO Team'
+    user_email_addr = user_doc.get('email', '') if user_doc else ''
+    
+    email_key, email_provider = await get_user_email_key(user["id"], user.get("role") == "admin", user_email_addr)
+    
+    if not email_key:
+        raise HTTPException(status_code=400, detail="Nu ai configurat o cheie API pentru email (Resend sau SendGrid). Mergi la Chei API pentru a adăuga una.")
     
     sent_count = 0
     for outreach in pending:
-        if not outreach.get('contact_email'):
+        if not outreach.get('contact_email') or "CAUTĂ EMAIL" in outreach.get('contact_email', ''):
             continue
         
         try:
@@ -2148,12 +2152,26 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
             </div>
             """
             
-            resend.Emails.send({
-                "from": f"{sender_name} <{SENDER_EMAIL}>",
-                "to": [outreach['contact_email']],
-                "subject": outreach['email_subject'],
-                "html": email_html
-            })
+            if email_provider == "resend":
+                import resend as resend_lib
+                resend_lib.api_key = email_key
+                resend_lib.Emails.send({
+                    "from": f"{sender_name} <{SENDER_EMAIL}>",
+                    "to": [outreach['contact_email']],
+                    "subject": outreach['email_subject'],
+                    "html": email_html
+                })
+            elif email_provider == "sendgrid":
+                import sendgrid
+                from sendgrid.helpers.mail import Mail, Email, To, Content
+                sg = sendgrid.SendGridAPIClient(api_key=email_key)
+                message = Mail(
+                    from_email=Email(SENDER_EMAIL, sender_name),
+                    to_emails=To(outreach['contact_email']),
+                    subject=outreach['email_subject'],
+                    html_content=Content("text/html", email_html)
+                )
+                sg.send(message)
             
             await db.backlink_outreach.update_one(
                 {"id": outreach["id"]},
@@ -2739,10 +2757,22 @@ async def trigger_backlink_outreach(
     for site in sites:
         site_id = site.get("id")
         site_name = site.get("site_name") or site.get("site_url", "Unknown")
+        site_url = site.get("site_url", "")
         niche = site.get("niche")
         
         if not niche:
             continue
+        
+        # Get user settings for outreach info
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "email": 1})
+        user_name = user_doc.get("name", "SEO Team") if user_doc else "SEO Team"
+        user_email_addr = user_doc.get("email", "") if user_doc else ""
+        
+        # Get outreach settings
+        user_settings = await db.settings.find_one({"user_id": user_id}, {"_id": 0})
+        outreach_position = user_settings.get("outreach_position", "Administrator") if user_settings else "Administrator"
+        outreach_phone = user_settings.get("outreach_phone", "0721578660") if user_settings else "0721578660"
+        outreach_email = user_settings.get("outreach_email", user_email_addr) if user_settings else user_email_addr
         
         logging.info(f"[MANUAL OUTREACH] Processing site: {site_name} ({niche})")
         
@@ -2852,15 +2882,30 @@ async def trigger_backlink_outreach(
                     email_chat = LlmChat(api_key=llm_api_key, system_message="You write professional outreach emails.")
                     email_chat.with_model("openai", "gpt-4o")
                     
+                    # Detect target language
+                    target_domain = opportunity.get('domain', '').lower()
+                    target_language = "ROMÂNĂ" if target_domain.endswith('.ro') else "ENGLEZĂ (English)"
+                    
                     email_body = await email_chat.send_message(UserMessage(content=f"""
-                        Write a short, professional backlink outreach email (max 100 words).
+                        Scrie un email profesional de outreach pentru backlink în {target_language}.
                         
-                        My site: {site_name}
-                        My article: "{article.get('title')}"
-                        Target site: {opportunity.get('domain')}
+                        INFORMAȚII EXPEDITOR (folosește EXACT aceste date):
+                        - Nume: {user_name}
+                        - Poziție: {outreach_position}
+                        - Email: {outreach_email}
+                        - Telefon: {outreach_phone}
+                        - Website: {site_url}
+                        - Nume site: {site_name}
                         
-                        Make it personalized and include a clear call to action.
-                        Return ONLY the email body, no subject.
+                        Site țintă: {opportunity.get('domain')}
+                        Articol de promovat: "{article.get('title')}"
+                        URL articol: {article.get('wordpress_url') or site_url}
+                        
+                        REGULI:
+                        1. Email scurt, max 100 cuvinte
+                        2. Include semnătura cu TOATE datele de contact (nume, poziție, email, telefon, website)
+                        3. Scrie DOAR corpul emailului, fără subiect
+                        4. NU folosi placeholdere sau paranteze drepte
                     """))
                     
                     subject = f"Collaboration - {article.get('title', 'Guest Post')[:40]}"
@@ -2881,19 +2926,37 @@ async def trigger_backlink_outreach(
                         "created_at": datetime.now(timezone.utc).isoformat()
                     }
                     
-                    # Send only if we have valid email AND Resend is configured
-                    if has_valid_email and RESEND_API_KEY and SENDER_EMAIL:
-                        try:
-                            resend.Emails.send({
-                                "from": f"{site_name} <{SENDER_EMAIL}>",
-                                "to": [contact_email],
-                                "subject": subject,
-                                "html": f"<div style='font-family: Arial;'>{email_body.replace(chr(10), '<br>')}</div>"
-                            })
-                            outreach_doc["status"] = "sent"
-                            outreach_doc["sent_at"] = datetime.now(timezone.utc).isoformat()
-                        except Exception as e:
-                            logging.error(f"[MANUAL OUTREACH] Failed to send email: {e}")
+                    # Send only if we have valid email AND email API key (BYOAK or platform)
+                    if has_valid_email:
+                        email_key, email_provider = await get_user_email_key(user_id, False, user_email_addr)
+                        if email_key:
+                            try:
+                                if email_provider == "resend":
+                                    import resend as resend_lib
+                                    resend_lib.api_key = email_key
+                                    resend_lib.Emails.send({
+                                        "from": f"{user_name} <{SENDER_EMAIL}>",
+                                        "to": [contact_email],
+                                        "subject": subject,
+                                        "html": f"<div style='font-family: Arial;'>{email_body.replace(chr(10), '<br>')}</div>"
+                                    })
+                                elif email_provider == "sendgrid":
+                                    import sendgrid
+                                    from sendgrid.helpers.mail import Mail, Email, To, Content
+                                    sg = sendgrid.SendGridAPIClient(api_key=email_key)
+                                    message = Mail(
+                                        from_email=Email(SENDER_EMAIL, user_name),
+                                        to_emails=To(contact_email),
+                                        subject=subject,
+                                        html_content=Content("text/html", f"<div style='font-family: Arial;'>{email_body.replace(chr(10), '<br>')}</div>")
+                                    )
+                                    sg.send(message)
+                                
+                                outreach_doc["status"] = "sent"
+                                outreach_doc["sent_at"] = datetime.now(timezone.utc).isoformat()
+                                logging.info(f"[MANUAL OUTREACH] Sent email to {contact_email}")
+                            except Exception as e:
+                                logging.error(f"[MANUAL OUTREACH] Failed to send email: {e}")
                     
                     await db.backlink_outreach.insert_one(outreach_doc)
                     total_emails += 1
