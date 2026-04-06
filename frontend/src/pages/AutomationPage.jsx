@@ -445,8 +445,10 @@ export default function AutomationPage() {
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const scheduled = scheduledDates[dateKey] || [];
-      const isToday = new Date().toISOString().split('T')[0] === dateKey;
-      const isPast = new Date(dateKey) < new Date(new Date().toISOString().split('T')[0]);
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const isToday = todayKey === dateKey;
+      const isPast = new Date(dateKey) < new Date(todayKey);
       
       // Get articles published on this date (for showing checkmarks even without schedule)
       const articlesOnDate = getArticlesForDate(dateKey);
@@ -466,7 +468,7 @@ export default function AutomationPage() {
             {/* Show scheduled items */}
             {scheduled.map((item, idx) => {
               // Check if published - works for today AND past dates
-              const wasPublished = isPublishedOnDate(item.siteId, dateKey);
+              const wasPublished = (isPast || isToday) && isPublishedOnDate(item.siteId, dateKey);
               return (
                 <div 
                   key={idx}

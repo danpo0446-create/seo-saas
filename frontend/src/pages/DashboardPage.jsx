@@ -46,7 +46,9 @@ import {
   Legend,
   BarChart,
   Bar,
-  Cell
+  Cell,
+  ComposedChart,
+  Line
 } from 'recharts';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -529,6 +531,79 @@ export default function DashboardPage() {
                     fill="url(#colorImpressions)" 
                   />
                 </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CTR & Position Chart */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-orange-500" />
+              CTR & Poziție Medie
+            </CardTitle>
+            <CardDescription>
+              Evoluția ratei de click și a poziției în căutări
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={formatChartData()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#666"
+                    tick={{ fill: '#999', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    yAxisId="left"
+                    stroke="#FF9800"
+                    tick={{ fill: '#FF9800', fontSize: 12 }}
+                    tickFormatter={(value) => `${value.toFixed(1)}%`}
+                    domain={[0, 'auto']}
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#E91E63"
+                    tick={{ fill: '#E91E63', fontSize: 12 }}
+                    reversed={true}
+                    domain={[1, 'auto']}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1a1a1a', 
+                      border: '1px solid #333',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value, name) => {
+                      if (name === 'CTR') return [`${value.toFixed(2)}%`, name];
+                      if (name === 'Poziție') return [value.toFixed(1), name];
+                      return [value, name];
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    yAxisId="left"
+                    type="monotone" 
+                    dataKey="ctr" 
+                    name="CTR"
+                    stroke="#FF9800" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="position" 
+                    name="Poziție"
+                    stroke="#E91E63" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
