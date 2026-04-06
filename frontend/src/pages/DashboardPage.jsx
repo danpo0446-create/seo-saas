@@ -454,25 +454,27 @@ export default function DashboardPage() {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Traffic Chart */}
-        <Card className="lg:col-span-2 bg-card border-border">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle className="font-heading text-lg">
-                  Trafic {gscStatus.connected ? 'Real' : 'Demo'}
-                </CardTitle>
-                {gscStatus.connected && currentSite && (
-                  <CardDescription className="text-xs mt-1">
-                    {currentSite.site_name || currentSite.site_url}
-                  </CardDescription>
-                )}
-                {!currentSite && (
-                  <CardDescription className="text-xs mt-1 text-yellow-500">
-                    Selectează un site din meniul din stânga
-                  </CardDescription>
-                )}
-              </div>
+        {/* Left column - Charts stacked vertically */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Traffic Chart */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle className="font-heading text-lg">
+                    Trafic {gscStatus.connected ? 'Real' : 'Demo'}
+                  </CardTitle>
+                  {gscStatus.connected && currentSite && (
+                    <CardDescription className="text-xs mt-1">
+                      {currentSite.site_name || currentSite.site_url}
+                    </CardDescription>
+                  )}
+                  {!currentSite && (
+                    <CardDescription className="text-xs mt-1 text-yellow-500">
+                      Selectează un site din meniul din stânga
+                    </CardDescription>
+                  )}
+                </div>
               <div className="flex gap-2">
                 <Select value={selectedPeriod} onValueChange={handlePeriodChange}>
                   <SelectTrigger className="w-[160px] bg-secondary border-border">
@@ -608,9 +610,10 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
-        {/* Google Search Console Stats */}
-        <Card className="bg-card border-border">
+        {/* Google Search Console Stats - Right column */}
+        <Card className="bg-card border-border h-fit">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="font-heading text-lg">Google Search Console</CardTitle>
