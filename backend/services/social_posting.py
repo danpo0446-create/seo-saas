@@ -15,6 +15,7 @@ FACEBOOK_PAGES = {
     "bestbuybabys.com": {"page_id": "106559875661899", "name": "Best Buy Babys"},
     "azurelady.com": {"page_id": "412510071952130", "name": "Azure Lady"},
     "storeforladies.com": {"page_id": "115952541516299", "name": "Store for Ladies"},
+    "martechassistance.com": {"page_id": "", "name": "Martech Assistance"},  # User needs to add Page ID
 }
 
 async def post_to_facebook_page(

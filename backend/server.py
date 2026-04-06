@@ -1843,6 +1843,11 @@ async def prepare_backlink_outreach(
         
         email_data = json.loads(clean_email)
         
+        # Clean markdown links from email body [text](url) -> url
+        email_body = email_data.get("body", "")
+        email_body = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\2', email_body)
+        email_data["body"] = email_body
+        
     except Exception as e:
         logging.error(f"Email generation failed: {e}")
         email_data = {
@@ -3137,6 +3142,11 @@ async def search_opportunities_for_single_site(request: SiteSearchRequest, user:
                     
                     email_data = json.loads(clean_email)
                     
+                    # Clean markdown links from email body [text](url) -> url
+                    email_body = email_data.get("body", "")
+                    email_body = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\2', email_body)
+                    email_data["body"] = email_body
+                    
                     outreach_doc = {
                         "id": str(uuid.uuid4()),
                         "user_id": user_id,
@@ -3388,6 +3398,11 @@ async def trigger_full_backlink_search(user: dict = Depends(get_current_user)):
                                 clean_email = clean_email[4:]
                         
                         email_data = json.loads(clean_email)
+                        
+                        # Clean markdown links from email body [text](url) -> url
+                        email_body = email_data.get("body", "")
+                        email_body = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\2', email_body)
+                        email_data["body"] = email_body
                         
                         outreach_doc = {
                             "id": str(uuid.uuid4()),
@@ -9084,6 +9099,11 @@ async def search_new_backlink_opportunities():
                                         clean_email = clean_email[4:]
                                 
                                 email_data = json.loads(clean_email)
+                                
+                                # Clean markdown links from email body [text](url) -> text (url)
+                                email_body = email_data.get("body", "")
+                                email_body = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', email_body)
+                                email_data["body"] = email_body
                                 
                                 # Save outreach draft (pending approval)
                                 outreach_doc = {
