@@ -18,7 +18,7 @@ PEXELS_API_KEY = os.environ.get('PEXELS_API_KEY')
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
 # Email
-SENDER_EMAIL = "SEO Platform <noreply@seamanshelp.com>"
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'noreply@martechassistance.com')
 
 # Timezone
 ROMANIA_TZ = pytz.timezone('Europe/Bucharest')
