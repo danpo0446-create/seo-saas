@@ -7754,12 +7754,15 @@ async def run_site_automation(site_id: str, user_id: str):
             freq_days = {"daily": 1, "every_2_days": 2, "every_3_days": 3, "weekly": 7}
             days_required = freq_days.get(settings.get("frequency", "daily"), 1)
             
-            # Calculate hours since last generation
-            hours_since_last = (datetime.now(timezone.utc) - last_gen_date).total_seconds() / 3600
-            min_hours_required = (days_required - 1) * 24 + 20  # Allow 4 hour buffer for same day
+            # Check by calendar days, not hours
+            # Convert to Romania timezone for proper day comparison
+            ROMANIA_TZ = pytz.timezone('Europe/Bucharest')
+            last_gen_romania = last_gen_date.astimezone(ROMANIA_TZ).date()
+            today_romania = datetime.now(ROMANIA_TZ).date()
+            days_since_last = (today_romania - last_gen_romania).days
             
-            if hours_since_last < min_hours_required:
-                logging.info(f"[SCHEDULER] Site {site_id}: Skipping - only {hours_since_last:.1f} hours since last generation (requires ~{min_hours_required} hours for {settings.get('frequency')} frequency)")
+            if days_since_last < days_required:
+                logging.info(f"[SCHEDULER] Site {site_id}: Skipping - generated {days_since_last} days ago (requires {days_required} days for {settings.get('frequency')} frequency)")
                 return
         except Exception as e:
             logging.warning(f"[SCHEDULER] Site {site_id}: Error parsing last_generation date: {e} - will proceed with generation")
