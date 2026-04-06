@@ -2846,9 +2846,7 @@ async def trigger_backlink_outreach(
                 
                 article = articles[i % len(articles)]
                 contact_email = opportunity.get("contact_info", "")
-                
-                if not contact_email or "@" not in contact_email:
-                    continue
+                has_valid_email = contact_email and "@" in contact_email
                 
                 try:
                     email_chat = LlmChat(api_key=llm_api_key, system_message="You write professional outreach emails.")
@@ -2872,18 +2870,19 @@ async def trigger_backlink_outreach(
                         "user_id": user_id,
                         "site_id": site_id,
                         "backlink_domain": opportunity.get("domain"),
-                        "contact_email": contact_email,
+                        "contact_email": contact_email if has_valid_email else f"CAUTĂ EMAIL: {opportunity.get('domain')}",
                         "article_id": article.get("id"),
                         "article_title": article.get("title"),
                         "article_url": article.get("wordpress_url") or site.get("site_url", ""),
                         "email_subject": subject,
                         "email_body": email_body,
                         "status": "draft",
+                        "needs_email": not has_valid_email,
                         "created_at": datetime.now(timezone.utc).isoformat()
                     }
                     
-                    # Send if Resend is configured
-                    if RESEND_API_KEY and SENDER_EMAIL:
+                    # Send only if we have valid email AND Resend is configured
+                    if has_valid_email and RESEND_API_KEY and SENDER_EMAIL:
                         try:
                             resend.Emails.send({
                                 "from": f"{site_name} <{SENDER_EMAIL}>",

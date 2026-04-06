@@ -333,8 +333,9 @@ async def auto_post_article_to_social(
     logging.info(f"[SOCIAL] Facebook config for {clean_url}: {fb_config} (matched: {matched_domain})")
     
     if fb_config:
-        # Get page access token from site settings
+        # Get page access token and page_id from site settings (DB takes priority)
         fb_token = site.get("facebook_page_token")
+        fb_page_id = site.get("facebook_page_id") or fb_config.get("page_id")
         
         # If no token for this site, try to find one from another site with the same user
         if not fb_token:
@@ -343,37 +344,42 @@ async def auto_post_article_to_social(
                 # Find another site with a Facebook token (same user)
                 other_site = await db.wordpress_configs.find_one(
                     {"user_id": user_id, "facebook_page_token": {"$exists": True, "$ne": ""}},
-                    {"_id": 0, "facebook_page_token": 1, "site_url": 1}
+                    {"_id": 0, "facebook_page_token": 1, "facebook_page_id": 1, "site_url": 1}
                 )
                 if other_site and other_site.get("facebook_page_token"):
                     fb_token = other_site["facebook_page_token"]
+                    if not fb_page_id and other_site.get("facebook_page_id"):
+                        fb_page_id = other_site["facebook_page_id"]
                     logging.info(f"[SOCIAL] Using Facebook token from {other_site.get('site_url')}")
             except Exception as e:
                 logging.warning(f"[SOCIAL] Could not find shared FB token: {e}")
         
         logging.info(f"[SOCIAL] Facebook token exists: {fb_token is not None and len(str(fb_token)) > 10}")
+        logging.info(f"[SOCIAL] Facebook page_id: {fb_page_id}")
         
-        if fb_token:
-            logging.info(f"[SOCIAL] Attempting to post to Facebook page {fb_config['page_id']}")
+        if fb_token and fb_page_id:
+            logging.info(f"[SOCIAL] Attempting to post to Facebook page {fb_page_id}")
             results["facebook"] = await post_to_facebook_page(
                 page_access_token=fb_token,
-                page_id=fb_config["page_id"],
+                page_id=fb_page_id,
                 message=message,
                 link=article_url,
                 image_url=image_url
             )
             logging.info(f"[SOCIAL] Facebook post result: {results['facebook']}")
+        elif fb_token and not fb_page_id:
+            logging.warning(f"[SOCIAL] Facebook token exists but no Page ID for {clean_url}")
+            results["facebook"] = {"success": False, "error": "Facebook Page ID lipsește - adaugă-l în setările site-ului"}
         else:
             logging.warning(f"[SOCIAL] No Facebook token for site {clean_url}")
             results["facebook"] = {"success": False, "error": "No Facebook token configured - please connect Facebook in WordPress Sites page"}
     else:
         logging.warning(f"[SOCIAL] Site {clean_url} not in FACEBOOK_PAGES dictionary")
     
-    # Post to LinkedIn only for seamanshelp (personal profile)
-    if "seamanshelp" in clean_url:
-        linkedin_token = site.get("linkedin_access_token")
-        linkedin_person_id = site.get("linkedin_person_id")
-        if linkedin_token and linkedin_person_id:
+    # Post to LinkedIn if connected (any site with LinkedIn tokens)
+    linkedin_token = site.get("linkedin_access_token")
+    linkedin_person_id = site.get("linkedin_person_id")
+    if linkedin_token and linkedin_person_id:
             results["linkedin"] = await post_to_linkedin_personal(
                 access_token=linkedin_token,
                 person_id=linkedin_person_id,
@@ -382,8 +388,8 @@ async def auto_post_article_to_social(
                 link=article_url,
                 image_url=image_url
             )
-        else:
-            results["linkedin"] = {"success": False, "error": "No LinkedIn token configured"}
+    else:
+        results["linkedin"] = {"success": False, "error": "No LinkedIn token configured - please connect LinkedIn in WordPress Sites page"}
     
     # Save posting log
     log_entry = {
