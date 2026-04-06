@@ -105,24 +105,36 @@ async def get_user_email_key(user_id: str, is_admin: bool = False, user_email: s
     """Get email API key - prioritizes user's BYOAK keys. Platform fallback only for admin/test."""
     from saas.subscription_service import decrypt_api_key
     
+    logging.info(f"[EMAIL-KEY] Looking for email key for user {user_id[:8]}...")
+    
     user_keys = await db.user_api_keys.find_one({"user_id": user_id})
     
     if user_keys:
+        logging.info(f"[EMAIL-KEY] Found user_api_keys document. resend_key exists: {bool(user_keys.get('resend_key'))}")
         if user_keys.get("resend_key"):
             decrypted_key = decrypt_api_key(user_keys["resend_key"])
+            logging.info(f"[EMAIL-KEY] Decrypted key starts with: {decrypted_key[:10] if decrypted_key else 'EMPTY'}...")
             if decrypted_key and decrypted_key.startswith("re_"):
+                logging.info(f"[EMAIL-KEY] Valid Resend key found!")
                 return decrypted_key, "resend"
+            else:
+                logging.warning(f"[EMAIL-KEY] Resend key invalid or decryption failed")
         if user_keys.get("sendgrid_key"):
             decrypted_key = decrypt_api_key(user_keys["sendgrid_key"])
             if decrypted_key:
+                logging.info(f"[EMAIL-KEY] Valid SendGrid key found!")
                 return decrypted_key, "sendgrid"
+    else:
+        logging.warning(f"[EMAIL-KEY] No user_api_keys document found for user {user_id[:8]}")
     
     # Fallback to platform key ONLY for admin or test users
     is_test_user = "test" in user_email.lower() if user_email else False
     if is_admin or is_test_user:
         if RESEND_API_KEY:
+            logging.info(f"[EMAIL-KEY] Using platform fallback key")
             return RESEND_API_KEY, "resend"
     
+    logging.warning(f"[EMAIL-KEY] No email key found for user {user_id[:8]}")
     return None, None
 
 
@@ -2137,15 +2149,20 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
     
     email_key, email_provider = await get_user_email_key(user["id"], user.get("role") == "admin", user_email_addr)
     
+    logging.info(f"[APPROVE-ALL] Email key found: {bool(email_key)}, provider: {email_provider}")
+    
     if not email_key:
         raise HTTPException(status_code=400, detail="Nu ai configurat o cheie API pentru email (Resend sau SendGrid). Mergi la Chei API pentru a adăuga una.")
     
     sent_count = 0
+    errors = []
     for outreach in pending:
         if not outreach.get('contact_email') or "CAUTĂ EMAIL" in outreach.get('contact_email', ''):
+            logging.info(f"[APPROVE-ALL] Skipping {outreach.get('backlink_domain')} - no valid email")
             continue
         
         try:
+            logging.info(f"[APPROVE-ALL] Attempting to send to {outreach['contact_email']}")
             email_html = f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 {outreach['email_body'].replace(chr(10), '<br>')}
@@ -2155,12 +2172,13 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
             if email_provider == "resend":
                 import resend as resend_lib
                 resend_lib.api_key = email_key
-                resend_lib.Emails.send({
+                result = resend_lib.Emails.send({
                     "from": f"{sender_name} <{SENDER_EMAIL}>",
                     "to": [outreach['contact_email']],
                     "subject": outreach['email_subject'],
                     "html": email_html
                 })
+                logging.info(f"[APPROVE-ALL] Resend response: {result}")
             elif email_provider == "sendgrid":
                 import sendgrid
                 from sendgrid.helpers.mail import Mail, Email, To, Content
@@ -2184,9 +2202,11 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
             sent_count += 1
             
         except Exception as e:
-            logging.error(f"[OUTREACH] Failed to send to {outreach.get('contact_email')}: {e}")
+            error_msg = str(e)
+            logging.error(f"[APPROVE-ALL] Failed to send to {outreach.get('contact_email')}: {error_msg}")
+            errors.append({"email": outreach.get('contact_email'), "error": error_msg})
     
-    return {"success": True, "sent": sent_count, "total": len(pending)}
+    return {"success": True, "sent": sent_count, "total": len(pending), "errors": errors if errors else None}
 
 @api_router.get("/backlinks/outreach/stats")
 async def get_outreach_stats(user: dict = Depends(get_current_user)):
