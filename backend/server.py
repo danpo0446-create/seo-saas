@@ -7680,9 +7680,14 @@ async def automation_diagnostic(user: dict = Depends(get_current_user)):
         # Check issues
         issues = []
         if not settings:
-            issues.append("Nu are setări de automatizare salvate")
-        elif not settings.get("automation_enabled"):
-            issues.append("Automatizarea nu e activată")
+            issues.append("Nu are setări de automatizare salvate în DB")
+        else:
+            if not settings.get("enabled"):
+                issues.append(f"enabled={settings.get('enabled')} (trebuie True)")
+            if settings.get("mode") != "automatic":
+                issues.append(f"mode={settings.get('mode')} (trebuie 'automatic')")
+            if settings.get("paused"):
+                issues.append(f"paused={settings.get('paused')} (trebuie False)")
         
         if not site.get("app_password"):
             issues.append("Lipsește Application Password pentru WordPress")
@@ -7693,13 +7698,17 @@ async def automation_diagnostic(user: dict = Depends(get_current_user)):
         diagnostic.append({
             "site_name": site_name,
             "site_id": site_id,
-            "automation_enabled": settings.get("automation_enabled", False) if settings else False,
-            "publish_hour": settings.get("publish_hour", "N/A") if settings else "N/A",
+            "settings_exist": bool(settings),
+            "mode": settings.get("mode") if settings else None,
+            "enabled": settings.get("enabled") if settings else None,
+            "paused": settings.get("paused") if settings else None,
+            "generation_hour": settings.get("generation_hour") if settings else None,
             "articles_generated_today": articles_today,
             "has_app_password": bool(site.get("app_password")),
             "has_niche": bool(site.get("niche")),
             "issues": issues,
-            "status": "OK" if not issues and settings and settings.get("automation_enabled") else "PROBLEMĂ"
+            "status": "OK" if not issues else "PROBLEMĂ",
+            "raw_settings": settings
         })
     
     return {"sites": diagnostic, "server_time": datetime.now(timezone.utc).isoformat()}
@@ -8511,9 +8520,11 @@ async def startup_event():
     
     # Load site-specific automation settings
     site_settings = await db.site_automation_settings.find(
-        {"enabled": True, "mode": "automatic"}, 
+        {"enabled": True, "mode": "automatic", "paused": {"$ne": True}}, 
         {"_id": 0}
     ).to_list(1000)
+    
+    logging.info(f"[SCHEDULER] Found {len(site_settings)} site automation settings to schedule")
     
     for settings in site_settings:
         site_id = settings.get("site_id")
@@ -8527,7 +8538,7 @@ async def startup_event():
             args=[site_id, user_id],
             replace_existing=True
         )
-        logging.info(f"Loaded site automation for site {site_id} at {hour}:00 Romania time")
+        logging.info(f"[SCHEDULER] Loaded site automation for site {site_id} at {hour}:00 Romania time")
     
     scheduler.start()
     logging.info("Scheduler started with Romania timezone (Europe/Bucharest)")
@@ -8905,12 +8916,18 @@ async def recover_missed_automation_jobs():
         
         logging.info(f"[RECOVERY] Current time in Romania: {romania_now.strftime('%Y-%m-%d %H:%M')} (hour: {current_hour})")
         
-        # Get all automation settings - must match scheduler query exactly
+        # Debug: Check all site_automation_settings first
+        all_settings_raw = await db.site_automation_settings.find({}).to_list(100)
+        logging.info(f"[RECOVERY] Total site_automation_settings documents: {len(all_settings_raw)}")
+        for s in all_settings_raw:
+            logging.info(f"[RECOVERY] Settings: site_id={s.get('site_id')}, mode={s.get('mode')}, enabled={s.get('enabled')}, paused={s.get('paused')}")
+        
+        # Get all automation settings - must be automatic mode, enabled, and NOT paused
         all_settings = await db.site_automation_settings.find(
-            {"enabled": True, "mode": "automatic"}  # Must be automatic mode AND enabled
+            {"enabled": True, "mode": "automatic", "paused": {"$ne": True}}
         ).to_list(100)
         
-        logging.info(f"[RECOVERY] Found {len(all_settings)} sites with automation enabled")
+        logging.info(f"[RECOVERY] Found {len(all_settings)} sites with automation enabled (not paused)")
         
         for settings in all_settings:
             site_id = settings.get("site_id")
