@@ -7862,7 +7862,6 @@ async def run_site_automation(site_id: str, user_id: str):
             
             # Check by calendar days, not hours
             # Convert to Romania timezone for proper day comparison
-            ROMANIA_TZ = pytz.timezone('Europe/Bucharest')
             last_gen_romania = last_gen_date.astimezone(ROMANIA_TZ).date()
             today_romania = datetime.now(ROMANIA_TZ).date()
             days_since_last = (today_romania - last_gen_romania).days
