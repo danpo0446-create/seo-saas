@@ -217,7 +217,10 @@ export default function AutomationPage() {
       email_notification: siteData.automation.email_notification !== false,
       include_product_links: siteData.automation.include_product_links || false,
       product_links_source: siteData.automation.product_links_source || '',
-      max_product_links: siteData.automation.max_product_links || 3
+      max_product_links: siteData.automation.max_product_links || 3,
+      internal_links: siteData.automation.internal_links || [],
+      min_internal_links: siteData.automation.min_internal_links || 2,
+      max_internal_links: siteData.automation.max_internal_links || 5
     });
   };
 
@@ -1180,6 +1183,70 @@ export default function AutomationPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Internal Links / Backlinks Section */}
+              <div className="space-y-4 p-4 rounded-lg bg-secondary/30">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-blue-400" />
+                  <Label className="font-medium">Linkuri Interne / Backlinks</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Aceste linkuri vor fi incluse automat în articolele generate pentru SEO și backlinks.
+                </p>
+                
+                <div className="space-y-2">
+                  <Label>URL-uri pentru backlinks (unul per linie)</Label>
+                  <textarea
+                    className="w-full min-h-[120px] p-3 rounded-md bg-background border border-input text-sm resize-y"
+                    placeholder="https://saas.seamanshelp.com/&#10;https://saas.seamanshelp.com/#features&#10;https://martechassistance.com/&#10;https://martechassistance.com/servicii/"
+                    value={(editSettings.internal_links || []).join('\n')}
+                    onChange={(e) => {
+                      const links = e.target.value.split('\n').filter(l => l.trim());
+                      setEditSettings({ ...editSettings, internal_links: links });
+                    }}
+                    data-testid="internal-links-textarea"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Minim linkuri per articol</Label>
+                    <Select 
+                      value={String(editSettings.min_internal_links || 2)} 
+                      onValueChange={(value) => setEditSettings({ ...editSettings, min_internal_links: parseInt(value) })}
+                    >
+                      <SelectTrigger data-testid="min-internal-links-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 link</SelectItem>
+                        <SelectItem value="2">2 linkuri</SelectItem>
+                        <SelectItem value="3">3 linkuri</SelectItem>
+                        <SelectItem value="4">4 linkuri</SelectItem>
+                        <SelectItem value="5">5 linkuri</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Maxim linkuri per articol</Label>
+                    <Select 
+                      value={String(editSettings.max_internal_links || 5)} 
+                      onValueChange={(value) => setEditSettings({ ...editSettings, max_internal_links: parseInt(value) })}
+                    >
+                      <SelectTrigger data-testid="max-internal-links-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2">2 linkuri</SelectItem>
+                        <SelectItem value="3">3 linkuri</SelectItem>
+                        <SelectItem value="5">5 linkuri</SelectItem>
+                        <SelectItem value="7">7 linkuri</SelectItem>
+                        <SelectItem value="10">10 linkuri</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </div>
           )}

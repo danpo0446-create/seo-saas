@@ -463,6 +463,10 @@ class SiteAutomationSettings(BaseModel):
     include_product_links: bool = False
     product_links_source: str = ""  # URL or keyword for product search
     max_product_links: int = 3
+    # Internal/backlink URLs to include in articles
+    internal_links: Optional[List[str]] = None  # List of URLs to use as backlinks
+    min_internal_links: int = 2  # Minimum internal links to include
+    max_internal_links: int = 5  # Maximum internal links to include
 
 class SiteAutomationSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -480,6 +484,9 @@ class SiteAutomationSettingsResponse(BaseModel):
     include_product_links: bool
     product_links_source: str
     max_product_links: int
+    internal_links: Optional[List[str]] = None
+    min_internal_links: int = 2
+    max_internal_links: int = 5
     last_generation: Optional[str] = None
     next_generation: Optional[str] = None
     articles_generated: int = 0
@@ -527,20 +534,33 @@ class ArticleTemplateResponse(BaseModel):
 
 # ============ EMAIL HELPER ============
 
-async def send_notification_email(to_email: str, subject: str, html_content: str):
-    """Send email notification using Resend"""
-    if not RESEND_API_KEY:
-        logging.warning("RESEND_API_KEY not configured, skipping email")
+async def send_notification_email(to_email: str, subject: str, html_content: str, user_id: str = None):
+    """Send email notification using Resend (BYOAK or platform key)"""
+    
+    email_key = None
+    
+    # Try BYOAK key first if user_id provided
+    if user_id:
+        email_key, _ = await get_user_email_key(user_id, False, to_email)
+    
+    # Fallback to platform key
+    if not email_key and RESEND_API_KEY:
+        email_key = RESEND_API_KEY
+    
+    if not email_key:
+        logging.warning("No email API key configured, skipping email notification")
         return None
     
     try:
+        import resend as resend_lib
+        resend_lib.api_key = email_key
         params = {
             "from": SENDER_EMAIL,
             "to": [to_email],
             "subject": subject,
             "html": html_content
         }
-        result = await asyncio.to_thread(resend.Emails.send, params)
+        result = await asyncio.to_thread(resend_lib.Emails.send, params)
         logging.info(f"Email sent to {to_email}: {result.get('id')}")
         return result
     except Exception as e:
@@ -4133,7 +4153,8 @@ async def publish_to_wordpress(article_id: str, site_id: Optional[str] = None, u
                 await send_notification_email(
                     user["email"],
                     f"✅ Articol publicat: {article['title']}",
-                    email_html
+                    email_html,
+                    user["id"]
                 )
             
             # POST TO SOCIAL MEDIA (Facebook, LinkedIn)
@@ -8000,6 +8021,26 @@ IMPORTANT - LINKURI PRODUSE:
 {f'- Focus pe produse legate de: {product_source}' if product_source else ''}
 """
     
+    # Internal/backlink URLs section
+    internal_links_instruction = ""
+    internal_links = settings.get("internal_links", [])
+    min_links = settings.get("min_internal_links", 2)
+    max_links_internal = settings.get("max_internal_links", 5)
+    
+    if internal_links and len(internal_links) > 0:
+        links_list = "\n".join([f"- {link}" for link in internal_links])
+        internal_links_instruction = f"""
+OBLIGATORIU - LINKURI INTERNE/BACKLINKS:
+Trebuie să incluzi EXACT între {min_links} și {max_links_internal} linkuri din lista de mai jos, plasate NATURAL în text:
+{links_list}
+
+REGULI pentru linkuri:
+1. Folosește format: <a href="URL_DIN_LISTĂ" target="_blank">text descriptiv relevant</a>
+2. Textul ancoră trebuie să fie NATURAL și relevant pentru context
+3. NU pune toate linkurile într-un singur loc - distribuie-le în tot articolul
+4. Fiecare link să fie în context relevant pentru pagina țintă
+"""
+    
     # CRITICAL: Force current year - NEVER use 2024 or 2025
     current_year = 2026
     
@@ -8031,6 +8072,7 @@ NU menționa NICIODATĂ anii 2020, 2021, 2022, 2023, 2024 sau 2025.
 Dacă menționezi un an, folosește DOAR {current_year}.
 
 {product_links_instruction}
+{internal_links_instruction}
 
 INSTRUCȚIUNI STRICTE:
 1. Scrie DOAR în limba ROMÂNĂ
@@ -8039,6 +8081,7 @@ INSTRUCȚIUNI STRICTE:
 4. NU include DOCTYPE, html, head, body, meta, style
 5. Scrie paragrafe LUNGI și DETALIATE
 6. Include cel puțin 6 secțiuni cu <h2>
+7. RESPECTĂ lungimea minimă de {target_words} cuvinte
 
 Scrie articolul COMPLET acum:"""
 
@@ -8126,35 +8169,44 @@ Continuă:"""
     
     # Send email notification - ONLY if email_notification setting is enabled
     should_send_email = settings.get("email_notification", True)
-    if should_send_email and notification_email and RESEND_API_KEY:
+    if should_send_email and notification_email:
         try:
-            status_text = "Publicat pe WordPress" if publish_success else "Salvat ca Draft"
-            email_html = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #00E676;">🤖 Articol Generat Automat</h2>
-                <p>Un nou articol a fost generat pentru <strong>{site_name}</strong>:</p>
-                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin: 0 0 10px 0;">{title}</h3>
-                    <p style="margin: 5px 0;"><strong>Categorie:</strong> {category}</p>
-                    <p style="margin: 5px 0;"><strong>Cuvinte:</strong> {word_count}</p>
-                    <p style="margin: 5px 0;"><strong>Keywords:</strong> {', '.join(keywords)}</p>
-                    <p style="margin: 5px 0;"><strong>Status:</strong> {status_text}</p>
-                    <p style="margin: 5px 0;"><strong>Linkuri produse:</strong> {'Da' if settings.get('include_product_links') else 'Nu'}</p>
-                    {f'<p style="margin: 10px 0 0 0;"><a href="{wp_url}" style="color: #00E676; font-weight: bold;">Vizualizează articolul →</a></p>' if wp_url else ''}
+            # Get user's email key (BYOAK)
+            email_key, email_provider = await get_user_email_key(user_id, False, notification_email)
+            
+            if email_key:
+                status_text = "Publicat pe WordPress" if publish_success else "Salvat ca Draft"
+                email_html = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #00E676;">🤖 Articol Generat Automat</h2>
+                    <p>Un nou articol a fost generat pentru <strong>{site_name}</strong>:</p>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <h3 style="margin: 0 0 10px 0;">{title}</h3>
+                        <p style="margin: 5px 0;"><strong>Categorie:</strong> {category}</p>
+                        <p style="margin: 5px 0;"><strong>Cuvinte:</strong> {word_count}</p>
+                        <p style="margin: 5px 0;"><strong>Keywords:</strong> {', '.join(keywords)}</p>
+                        <p style="margin: 5px 0;"><strong>Status:</strong> {status_text}</p>
+                        <p style="margin: 5px 0;"><strong>Linkuri produse:</strong> {'Da' if settings.get('include_product_links') else 'Nu'}</p>
+                        {f'<p style="margin: 10px 0 0 0;"><a href="{wp_url}" style="color: #00E676; font-weight: bold;">Vizualizează articolul →</a></p>' if wp_url else ''}
+                    </div>
+                    <p>Accesează aplicația pentru a gestiona articolele.</p>
+                    <p style="color: #888; font-size: 12px; margin-top: 30px;">
+                        Generat automat de SEO Automation Platform
+                    </p>
                 </div>
-                <p>Accesează aplicația pentru a gestiona articolele.</p>
-                <p style="color: #888; font-size: 12px; margin-top: 30px;">
-                    Generat automat de SEO Automation Platform
-                </p>
-            </div>
-            """
-            resend.Emails.send({
-                "from": SENDER_EMAIL,
-                "to": notification_email,
-                "subject": f"🤖 Articol nou: {title[:50]}",
-                "html": email_html
-            })
-            logging.info(f"[AUTOMATION] Site {site_name}: Email notification sent to {notification_email}")
+                """
+                
+                import resend as resend_lib
+                resend_lib.api_key = email_key
+                resend_lib.Emails.send({
+                    "from": SENDER_EMAIL,
+                    "to": notification_email,
+                    "subject": f"🤖 Articol nou: {title[:50]}",
+                    "html": email_html
+                })
+                logging.info(f"[AUTOMATION] Site {site_name}: Email notification sent to {notification_email}")
+            else:
+                logging.warning(f"[AUTOMATION] Site {site_name}: No email key configured, skipping notification")
         except Exception as e:
             logging.error(f"[AUTOMATION] Site {site_name}: Failed to send email - {str(e)}")
     
