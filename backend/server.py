@@ -2180,14 +2180,28 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Nu ai configurat o cheie API pentru email (Resend sau SendGrid). Mergi la Chei API pentru a adăuga una.")
     
     sent_count = 0
+    skipped_count = 0
     errors = []
+    
     for outreach in pending:
-        if not outreach.get('contact_email') or "CAUTĂ EMAIL" in outreach.get('contact_email', ''):
-            logging.info(f"[APPROVE-ALL] Skipping {outreach.get('backlink_domain')} - no valid email")
+        contact_email = outreach.get('contact_email', '')
+        
+        # Skip if no valid email (must contain @ and not be a placeholder)
+        if not contact_email or "@" not in contact_email or "CAUTĂ EMAIL" in contact_email or "TBD" in contact_email.upper():
+            logging.info(f"[APPROVE-ALL] Skipping {outreach.get('backlink_domain')} - invalid email: {contact_email[:50]}")
+            skipped_count += 1
+            continue
+        
+        # Validate email format
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, contact_email.strip()):
+            logging.info(f"[APPROVE-ALL] Skipping {outreach.get('backlink_domain')} - malformed email: {contact_email}")
+            skipped_count += 1
             continue
         
         try:
-            logging.info(f"[APPROVE-ALL] Attempting to send to {outreach['contact_email']}")
+            logging.info(f"[APPROVE-ALL] Attempting to send to {contact_email}")
             email_html = f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 {outreach['email_body'].replace(chr(10), '<br>')}
@@ -2199,7 +2213,7 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
                 resend_lib.api_key = email_key
                 result = resend_lib.Emails.send({
                     "from": f"{sender_name} <{SENDER_EMAIL}>",
-                    "to": [outreach['contact_email']],
+                    "to": [contact_email.strip()],
                     "subject": outreach['email_subject'],
                     "html": email_html
                 })
@@ -2226,12 +2240,17 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
             )
             sent_count += 1
             
+            # Rate limiting - wait 0.3 seconds between emails to avoid Resend limit (5/sec)
+            import asyncio
+            await asyncio.sleep(0.3)
+            
         except Exception as e:
             error_msg = str(e)
-            logging.error(f"[APPROVE-ALL] Failed to send to {outreach.get('contact_email')}: {error_msg}")
-            errors.append({"email": outreach.get('contact_email'), "error": error_msg})
+            logging.error(f"[APPROVE-ALL] Failed to send to {contact_email}: {error_msg}")
+            errors.append({"email": contact_email, "error": error_msg})
     
-    return {"success": True, "sent": sent_count, "total": len(pending), "errors": errors if errors else None}
+    logging.info(f"[APPROVE-ALL] Completed: sent={sent_count}, skipped={skipped_count}, errors={len(errors)}")
+    return {"success": True, "sent": sent_count, "skipped": skipped_count, "total": len(pending), "errors": errors if errors else None}
 
 @api_router.get("/backlinks/outreach/stats")
 async def get_outreach_stats(user: dict = Depends(get_current_user)):
