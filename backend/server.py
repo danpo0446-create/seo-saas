@@ -1615,12 +1615,24 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
     
     results = {"mobile": None, "desktop": None}
     
-    # Force IPv4 to avoid IPv6 IP restriction issues
-    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
-    async with httpx.AsyncClient(timeout=60.0, transport=transport) as client:
+    # Force IPv4 by using socket directly
+    import socket
+    
+    # Resolve googleapis.com to IPv4
+    try:
+        ipv4_addr = socket.getaddrinfo("www.googleapis.com", 443, socket.AF_INET)[0][4][0]
+        logging.info(f"[PAGESPEED] Resolved googleapis.com to IPv4: {ipv4_addr}")
+    except Exception as e:
+        logging.error(f"[PAGESPEED] Failed to resolve IPv4: {e}")
+        ipv4_addr = None
+    
+    async with httpx.AsyncClient(timeout=60.0) as client:
         for strategy in ["mobile", "desktop"]:
             try:
-                url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+                # Use IPv4 address directly if resolved
+                base_host = f"https://{ipv4_addr}" if ipv4_addr else "https://www.googleapis.com"
+                url = f"{base_host}/pagespeedonline/v5/runPagespeed"
+                
                 params = {
                     "url": site_url,
                     "strategy": strategy,
@@ -1628,7 +1640,9 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
                     "category": ["performance", "seo", "accessibility", "best-practices"]
                 }
                 
-                response = await client.get(url, params=params)
+                headers = {"Host": "www.googleapis.com"} if ipv4_addr else {}
+                
+                response = await client.get(url, params=params, headers=headers)
                 
                 if response.status_code == 429:
                     raise HTTPException(status_code=429, detail="PageSpeed API quota exceeded. Try again later.")
