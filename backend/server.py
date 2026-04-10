@@ -4287,10 +4287,14 @@ async def get_gsc_auth_url(user: dict = Depends(get_current_user)):
         prompt="consent"
     )
     
-    # Store state for verification
+    # Store state AND code_verifier for PKCE verification
     await db.gsc_states.update_one(
         {"user_id": user["id"]},
-        {"$set": {"state": state, "created_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {
+            "state": state, 
+            "code_verifier": flow.code_verifier,  # Save PKCE code_verifier
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
         upsert=True
     )
     
@@ -4302,13 +4306,19 @@ async def gsc_oauth_callback(code: str = Query(...), state: str = Query(...)):
     # Find user by state
     state_doc = await db.gsc_states.find_one({"state": state})
     if not state_doc:
+        logging.error(f"GSC OAuth: Invalid state - {state}")
         raise HTTPException(status_code=400, detail="Invalid state")
     
     user_id = state_doc["user_id"]
+    code_verifier = state_doc.get("code_verifier")  # Retrieve PKCE code_verifier
     
     flow = create_gsc_oauth_flow()
     if not flow:
         raise HTTPException(status_code=400, detail="Google OAuth not configured")
+    
+    # Set the code_verifier on the flow before fetching token
+    if code_verifier:
+        flow.code_verifier = code_verifier
     
     try:
         flow.fetch_token(code=code)
@@ -4329,6 +4339,8 @@ async def gsc_oauth_callback(code: str = Query(...), state: str = Query(...)):
         
         # Clean up state
         await db.gsc_states.delete_one({"state": state})
+        
+        logging.info(f"GSC OAuth successful for user {user_id[:8]}")
         
         # Redirect to frontend
         return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?gsc_connected=true")
