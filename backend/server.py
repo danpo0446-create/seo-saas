@@ -1596,7 +1596,8 @@ PAGESPEED_API_KEY = os.environ.get('PAGESPEED_API_KEY', '')
 @api_router.get("/pagespeed/analyze/{site_id}")
 async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)):
     """Analyze site with Google PageSpeed Insights API"""
-    import httpx
+    import subprocess
+    import json as json_module
     
     # Get site
     site = await db.wordpress_configs.find_one(
@@ -1615,113 +1616,96 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
     
     results = {"mobile": None, "desktop": None}
     
-    # Force IPv4 by using socket directly
-    import socket
-    
-    # Resolve googleapis.com to IPv4
-    try:
-        ipv4_addr = socket.getaddrinfo("www.googleapis.com", 443, socket.AF_INET)[0][4][0]
-        logging.info(f"[PAGESPEED] Resolved googleapis.com to IPv4: {ipv4_addr}")
-    except Exception as e:
-        logging.error(f"[PAGESPEED] Failed to resolve IPv4: {e}")
-        ipv4_addr = None
-    
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        for strategy in ["mobile", "desktop"]:
-            try:
-                # Use IPv4 address directly if resolved
-                base_host = f"https://{ipv4_addr}" if ipv4_addr else "https://www.googleapis.com"
-                url = f"{base_host}/pagespeedonline/v5/runPagespeed"
-                
-                params = {
-                    "url": site_url,
-                    "strategy": strategy,
-                    "key": PAGESPEED_API_KEY,
-                    "category": ["performance", "seo", "accessibility", "best-practices"]
-                }
-                
-                headers = {"Host": "www.googleapis.com"} if ipv4_addr else {}
-                
-                response = await client.get(url, params=params, headers=headers)
-                
-                if response.status_code == 429:
-                    raise HTTPException(status_code=429, detail="PageSpeed API quota exceeded. Try again later.")
-                
-                if response.status_code == 403:
-                    error_data = response.json().get("error", {})
-                    error_msg = error_data.get("message", "Access denied")
-                    logging.error(f"PageSpeed API 403 error: {error_msg}")
-                    raise HTTPException(status_code=403, detail=f"PageSpeed API access denied: {error_msg[:100]}")
-                
-                if response.status_code != 200:
-                    logging.error(f"PageSpeed API error: {response.text}")
-                    continue
-                
-                data = response.json()
-                logging.info(f"[PAGESPEED] Raw API response keys: {data.keys()}")
-                
-                lighthouse = data.get("lighthouseResult", {})
-                categories = lighthouse.get("categories", {})
-                audits = lighthouse.get("audits", {})
-                
-                logging.info(f"[PAGESPEED] Categories found: {list(categories.keys())}")
-                
-                # Extract scores (multiply by 100)
-                scores = {
-                    "performance": int((categories.get("performance", {}).get("score") or 0) * 100),
-                    "seo": int((categories.get("seo", {}).get("score") or 0) * 100),
-                    "accessibility": int((categories.get("accessibility", {}).get("score") or 0) * 100),
-                    "best_practices": int((categories.get("best-practices", {}).get("score") or 0) * 100)
-                }
-                
-                logging.info(f"[PAGESPEED] Extracted scores for {strategy}: {scores}")
-                
-                # Extract recommendations
-                recommendations = []
-                auto_fixable_ids = {
-                    "render-blocking-resources": {"fix_type": "minify", "plugin": "Autoptimize"},
-                    "uses-optimized-images": {"fix_type": "images", "plugin": "ShortPixel"},
-                    "offscreen-images": {"fix_type": "lazyload", "plugin": "Lazy Load by WP Rocket"},
-                    "uses-long-cache-ttl": {"fix_type": "cache", "plugin": "LiteSpeed Cache"},
-                    "efficient-animated-content": {"fix_type": "images", "plugin": "ShortPixel"},
-                    "uses-responsive-images": {"fix_type": "images", "plugin": "ShortPixel"},
-                    "unminified-css": {"fix_type": "minify", "plugin": "Autoptimize"},
-                    "unminified-javascript": {"fix_type": "minify", "plugin": "Autoptimize"},
-                    "unused-css-rules": {"fix_type": "minify", "plugin": "Autoptimize"},
-                    "unused-javascript": {"fix_type": "minify", "plugin": "Autoptimize"},
-                }
-                
-                for audit_id, audit in audits.items():
-                    if audit.get("score") is not None and audit.get("score") < 1:
-                        fix_info = auto_fixable_ids.get(audit_id, {})
-                        recommendations.append({
-                            "id": audit_id,
-                            "title": audit.get("title", ""),
-                            "description": audit.get("description", ""),
-                            "score": int((audit.get("score") or 0) * 100),
-                            "savings_ms": audit.get("numericValue", 0),
-                            "display_value": audit.get("displayValue", ""),
-                            "auto_fixable": audit_id in auto_fixable_ids,
-                            "fix_type": fix_info.get("fix_type"),
-                            "plugin": fix_info.get("plugin")
-                        })
-                
-                # Sort by impact (lower score = higher priority)
-                recommendations.sort(key=lambda x: (x["score"], -x.get("savings_ms", 0)))
-                
-                results[strategy] = {
-                    "scores": scores,
-                    "recommendations": recommendations[:20]  # Top 20 recommendations
-                }
-                
-            except httpx.TimeoutException:
-                logging.error(f"PageSpeed API timeout for {strategy}")
+    for strategy in ["mobile", "desktop"]:
+        try:
+            # Use curl with -4 flag to force IPv4
+            api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={site_url}&strategy={strategy}&key={PAGESPEED_API_KEY}&category=performance&category=seo&category=accessibility&category=best-practices"
+            
+            result = subprocess.run(
+                ["curl", "-4", "-s", "-m", "60", api_url],
+                capture_output=True,
+                text=True,
+                timeout=65
+            )
+            
+            if result.returncode != 0:
+                logging.error(f"[PAGESPEED] curl failed: {result.stderr}")
                 continue
-            except HTTPException:
-                raise
-            except Exception as e:
-                logging.error(f"PageSpeed API error ({strategy}): {str(e)}")
+            
+            data = json_module.loads(result.stdout)
+            
+            # Check for errors
+            if "error" in data:
+                error_msg = data["error"].get("message", "Unknown error")
+                logging.error(f"[PAGESPEED] API error for {strategy}: {error_msg}")
+                if data["error"].get("code") == 403:
+                    raise HTTPException(status_code=403, detail=f"PageSpeed API: {error_msg[:100]}")
                 continue
+            
+            logging.info(f"[PAGESPEED] Raw API response keys: {list(data.keys())}")
+            
+            lighthouse = data.get("lighthouseResult", {})
+            categories = lighthouse.get("categories", {})
+            audits = lighthouse.get("audits", {})
+            
+            logging.info(f"[PAGESPEED] Categories found: {list(categories.keys())}")
+            
+            # Extract scores (multiply by 100)
+            scores = {
+                "performance": int((categories.get("performance", {}).get("score") or 0) * 100),
+                "seo": int((categories.get("seo", {}).get("score") or 0) * 100),
+                "accessibility": int((categories.get("accessibility", {}).get("score") or 0) * 100),
+                "best_practices": int((categories.get("best-practices", {}).get("score") or 0) * 100)
+            }
+            
+            logging.info(f"[PAGESPEED] Extracted scores for {strategy}: {scores}")
+            
+            # Extract recommendations
+            recommendations = []
+            auto_fixable_ids = {
+                "render-blocking-resources": {"fix_type": "minify", "plugin": "Autoptimize"},
+                "uses-optimized-images": {"fix_type": "images", "plugin": "ShortPixel"},
+                "offscreen-images": {"fix_type": "lazyload", "plugin": "Lazy Load by WP Rocket"},
+                "uses-long-cache-ttl": {"fix_type": "cache", "plugin": "LiteSpeed Cache"},
+                "efficient-animated-content": {"fix_type": "images", "plugin": "ShortPixel"},
+                "uses-responsive-images": {"fix_type": "images", "plugin": "ShortPixel"},
+                "unminified-css": {"fix_type": "minify", "plugin": "Autoptimize"},
+                "unminified-javascript": {"fix_type": "minify", "plugin": "Autoptimize"},
+                "unused-css-rules": {"fix_type": "minify", "plugin": "Autoptimize"},
+                "unused-javascript": {"fix_type": "minify", "plugin": "Autoptimize"},
+            }
+            
+            for audit_id, audit in audits.items():
+                if audit.get("score") is not None and audit.get("score") < 1:
+                    fix_info = auto_fixable_ids.get(audit_id, {})
+                    recommendations.append({
+                        "id": audit_id,
+                        "title": audit.get("title", ""),
+                        "description": audit.get("description", ""),
+                        "score": int((audit.get("score") or 0) * 100),
+                        "savings_ms": audit.get("numericValue", 0),
+                        "display_value": audit.get("displayValue", ""),
+                        "auto_fixable": audit_id in auto_fixable_ids,
+                        "fix_type": fix_info.get("fix_type"),
+                        "plugin": fix_info.get("plugin")
+                    })
+            
+            # Sort by impact (lower score = higher priority)
+            recommendations.sort(key=lambda x: (x["score"], -x.get("savings_ms", 0)))
+            
+            results[strategy] = {
+                "scores": scores,
+                "recommendations": recommendations[:20]  # Top 20 recommendations
+            }
+            
+        except subprocess.TimeoutExpired:
+            logging.error(f"PageSpeed API timeout for {strategy}")
+            continue
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error(f"PageSpeed API error ({strategy}): {str(e)}")
+            continue
     
     if not results["mobile"] and not results["desktop"]:
         raise HTTPException(status_code=500, detail="Failed to analyze site with PageSpeed API")
