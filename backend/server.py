@@ -8681,8 +8681,6 @@ async def send_startup_notification():
         return
     
     try:
-        from saas.email_service import email_service
-        
         now = datetime.now(ROMANIA_TZ)
         
         # Get list of scheduled jobs
@@ -8710,12 +8708,19 @@ async def send_startup_notification():
         </div>
         """
         
-        await email_service.send_email(
-            to_email=admin_email,
-            subject="✅ SEO SaaS App Started Successfully",
-            html_content=html_content
-        )
-        logging.info(f"[STARTUP] Sent startup notification to {admin_email}")
+        # Use direct Resend API call instead of email_service
+        if RESEND_API_KEY:
+            import resend as resend_lib
+            resend_lib.api_key = RESEND_API_KEY
+            resend_lib.Emails.send({
+                "from": SENDER_EMAIL,
+                "to": [admin_email],
+                "subject": "✅ SEO SaaS App Started Successfully",
+                "html": html_content
+            })
+            logging.info(f"[STARTUP] Sent startup notification to {admin_email}")
+        else:
+            logging.warning("[STARTUP] No RESEND_API_KEY, skipping startup email")
     except Exception as e:
         logging.error(f"[STARTUP] Failed to send startup notification: {e}")
 
