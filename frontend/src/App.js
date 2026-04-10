@@ -32,6 +32,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import SetupGuidePage from "@/pages/SetupGuidePage";
 import DocsPage from "@/pages/DocsPage";
+import PageSpeedPage from "@/pages/PageSpeedPage";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -110,6 +111,7 @@ function App() {
               <Route path="reports" element={<ReportsPage />} />
               <Route path="monitor" element={<MonitorPage />} />
               <Route path="technical-audit" element={<TechnicalAuditPage />} />
+              <Route path="pagespeed" element={<PageSpeedPage />} />
               <Route path="business-analysis" element={<BusinessAnalysisPage />} />
               <Route path="indexing" element={<IndexingPage />} />
               <Route path="settings" element={<SettingsPage />} />

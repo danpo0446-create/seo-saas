@@ -34,7 +34,8 @@ import {
   BarChart3,
   CreditCard,
   Shield,
-  Key
+  Key,
+  Gauge
 } from 'lucide-react';
 
 const navItems = [
@@ -47,6 +48,7 @@ const navItems = [
   { path: '/app/web2', icon: Share2, label: 'Web 2.0 Links', adminOnly: true },
   { path: '/app/wordpress', icon: Globe, label: 'Site-uri WordPress' },
   { path: '/app/automation', icon: Bot, label: 'Automatizare' },
+  { path: '/app/pagespeed', icon: Gauge, label: 'PageSpeed' },
   { path: '/app/reports', icon: BarChart3, label: 'Rapoarte' },
   { path: '/app/monitor', icon: Activity, label: 'Monitorizare' },
   { path: '/app/technical-audit', icon: FileSearch, label: 'Audit Tehnic' },
