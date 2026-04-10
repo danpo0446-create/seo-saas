@@ -1631,14 +1631,24 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
                 if response.status_code == 429:
                     raise HTTPException(status_code=429, detail="PageSpeed API quota exceeded. Try again later.")
                 
+                if response.status_code == 403:
+                    error_data = response.json().get("error", {})
+                    error_msg = error_data.get("message", "Access denied")
+                    logging.error(f"PageSpeed API 403 error: {error_msg}")
+                    raise HTTPException(status_code=403, detail=f"PageSpeed API access denied: {error_msg[:100]}")
+                
                 if response.status_code != 200:
                     logging.error(f"PageSpeed API error: {response.text}")
                     continue
                 
                 data = response.json()
+                logging.info(f"[PAGESPEED] Raw API response keys: {data.keys()}")
+                
                 lighthouse = data.get("lighthouseResult", {})
                 categories = lighthouse.get("categories", {})
                 audits = lighthouse.get("audits", {})
+                
+                logging.info(f"[PAGESPEED] Categories found: {list(categories.keys())}")
                 
                 # Extract scores (multiply by 100)
                 scores = {
@@ -1647,6 +1657,8 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
                     "accessibility": int((categories.get("accessibility", {}).get("score") or 0) * 100),
                     "best_practices": int((categories.get("best-practices", {}).get("score") or 0) * 100)
                 }
+                
+                logging.info(f"[PAGESPEED] Extracted scores for {strategy}: {scores}")
                 
                 # Extract recommendations
                 recommendations = []
