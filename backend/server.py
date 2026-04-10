@@ -1615,7 +1615,9 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
     
     results = {"mobile": None, "desktop": None}
     
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    # Force IPv4 to avoid IPv6 IP restriction issues
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+    async with httpx.AsyncClient(timeout=60.0, transport=transport) as client:
         for strategy in ["mobile", "desktop"]:
             try:
                 url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
