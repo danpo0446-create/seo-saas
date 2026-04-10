@@ -1596,7 +1596,6 @@ PAGESPEED_API_KEY = os.environ.get('PAGESPEED_API_KEY', '')
 @api_router.get("/pagespeed/analyze/{site_id}")
 async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)):
     """Analyze site with Google PageSpeed Insights API"""
-    import subprocess
     import json as json_module
     
     # Get site
@@ -1621,18 +1620,25 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
             # Use curl with -4 flag to force IPv4
             api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={site_url}&strategy={strategy}&key={PAGESPEED_API_KEY}&category=performance&category=seo&category=accessibility&category=best-practices"
             
-            result = subprocess.run(
-                ["curl", "-4", "-s", "-m", "60", api_url],
-                capture_output=True,
-                text=True,
-                timeout=65
+            logging.info(f"[PAGESPEED] Running curl for {strategy}...")
+            
+            # Use asyncio subprocess
+            process = await asyncio.create_subprocess_exec(
+                "curl", "-4", "-s", "-m", "90", api_url,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
             
-            if result.returncode != 0:
-                logging.error(f"[PAGESPEED] curl failed: {result.stderr}")
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=95)
+            
+            if process.returncode != 0:
+                logging.error(f"[PAGESPEED] curl failed: {stderr.decode()}")
                 continue
             
-            data = json_module.loads(result.stdout)
+            response_text = stdout.decode()
+            logging.info(f"[PAGESPEED] Got response for {strategy}, length: {len(response_text)}")
+            
+            data = json_module.loads(response_text)
             
             # Check for errors
             if "error" in data:
@@ -1698,7 +1704,7 @@ async def analyze_pagespeed(site_id: str, user: dict = Depends(get_current_user)
                 "recommendations": recommendations[:20]  # Top 20 recommendations
             }
             
-        except subprocess.TimeoutExpired:
+        except asyncio.TimeoutError:
             logging.error(f"PageSpeed API timeout for {strategy}")
             continue
         except HTTPException:
