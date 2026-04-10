@@ -2280,6 +2280,44 @@ async def get_outreach_stats(user: dict = Depends(get_current_user)):
         "total": pending + sent + responded + rejected
     }
 
+@api_router.delete("/backlinks/outreach/delete-invalid")
+async def delete_invalid_outreach(user: dict = Depends(get_current_user)):
+    """Delete outreach entries with invalid email addresses"""
+    import re
+    
+    # Find all outreach for this user
+    all_outreach = await db.backlink_outreach.find(
+        {"user_id": user["id"]},
+        {"_id": 0, "id": 1, "contact_email": 1, "backlink_domain": 1}
+    ).to_list(1000)
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    invalid_ids = []
+    
+    for outreach in all_outreach:
+        contact_email = outreach.get('contact_email', '')
+        
+        # Check if email is invalid
+        is_invalid = (
+            not contact_email or 
+            "@" not in contact_email or 
+            "CAUTĂ EMAIL" in contact_email or 
+            "TBD" in contact_email.upper() or
+            "check " in contact_email.lower() or
+            not re.match(email_pattern, contact_email.strip())
+        )
+        
+        if is_invalid:
+            invalid_ids.append(outreach['id'])
+            logging.info(f"[DELETE-INVALID] Marking for deletion: {outreach.get('backlink_domain')} - {contact_email[:50]}")
+    
+    if invalid_ids:
+        result = await db.backlink_outreach.delete_many({"id": {"$in": invalid_ids}})
+        logging.info(f"[DELETE-INVALID] Deleted {result.deleted_count} invalid outreach entries")
+        return {"success": True, "deleted": result.deleted_count}
+    
+    return {"success": True, "deleted": 0, "message": "No invalid emails found"}
+
 
 # ============ BACKLINK AUTOMATION STATUS ============
 

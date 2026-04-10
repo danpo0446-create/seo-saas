@@ -59,6 +59,7 @@ export default function BacklinksPage() {
   const [approvingEmail, setApprovingEmail] = useState(null);
   const [rejectingEmail, setRejectingEmail] = useState(null);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [deletingInvalid, setDeletingInvalid] = useState(false);
   
   // Outreach dialog state
   const [showOutreachDialog, setShowOutreachDialog] = useState(false);
@@ -181,7 +182,11 @@ export default function BacklinksPage() {
     setApprovingAll(true);
     try {
       const response = await axios.post(`${API}/backlinks/outreach/approve-all`, {}, { headers: getAuthHeaders() });
-      toast.success(`${response.data.sent} email-uri trimise din ${response.data.total}!`);
+      if (response.data.skipped > 0) {
+        toast.info(`${response.data.sent} trimise, ${response.data.skipped} sărite (email invalid)`);
+      } else {
+        toast.success(`${response.data.sent} email-uri trimise din ${response.data.total}!`);
+      }
       fetchPendingOutreach();
       fetchOutreach();
       fetchOutreachStats();
@@ -189,6 +194,25 @@ export default function BacklinksPage() {
       toast.error(error.response?.data?.detail || 'Eroare la trimiterea email-urilor');
     } finally {
       setApprovingAll(false);
+    }
+  };
+
+  const handleDeleteInvalid = async () => {
+    setDeletingInvalid(true);
+    try {
+      const response = await axios.delete(`${API}/backlinks/outreach/delete-invalid`, { headers: getAuthHeaders() });
+      if (response.data.deleted > 0) {
+        toast.success(`${response.data.deleted} intrări cu email invalid au fost șterse!`);
+        fetchPendingOutreach();
+        fetchOutreach();
+        fetchOutreachStats();
+      } else {
+        toast.info('Nu s-au găsit intrări cu email invalid');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Eroare la ștergere');
+    } finally {
+      setDeletingInvalid(false);
     }
   };
 
@@ -613,31 +637,52 @@ export default function BacklinksPage() {
           {pendingOutreach.length > 0 && (
             <Card className="bg-card border-border">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div>
                     <h3 className="font-semibold">Email-uri generate automat</h3>
                     <p className="text-sm text-muted-foreground">
                       Aceste email-uri au fost create automat pentru oportunități noi de backlink
                     </p>
                   </div>
-                  <Button
-                    onClick={handleApproveAll}
-                    disabled={approvingAll || pendingOutreach.length === 0}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    data-testid="approve-all-button"
-                  >
-                    {approvingAll ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Se trimit...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCheck className="w-4 h-4 mr-2" />
-                        Aprobă & Trimite Toate ({pendingOutreach.length})
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleDeleteInvalid}
+                      disabled={deletingInvalid}
+                      variant="outline"
+                      className="border-red-500/50 text-red-500 hover:bg-red-500/10"
+                      data-testid="delete-invalid-button"
+                    >
+                      {deletingInvalid ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Se șterg...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Șterge Invalid
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleApproveAll}
+                      disabled={approvingAll || pendingOutreach.length === 0}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      data-testid="approve-all-button"
+                    >
+                      {approvingAll ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Se trimit...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCheck className="w-4 h-4 mr-2" />
+                          Aprobă & Trimite Toate ({pendingOutreach.length})
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
