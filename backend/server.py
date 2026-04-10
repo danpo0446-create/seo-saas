@@ -2154,10 +2154,14 @@ async def reject_outreach_email(
 async def approve_all_outreach(user: dict = Depends(get_current_user)):
     """Approve and send all pending outreach emails"""
     
+    logging.info(f"[APPROVE-ALL] Starting for user {user['id'][:8]}...")
+    
     pending = await db.backlink_outreach.find(
         {"user_id": user["id"], "status": "pending_approval"},
         {"_id": 0}
     ).to_list(100)
+    
+    logging.info(f"[APPROVE-ALL] Found {len(pending)} pending emails")
     
     if not pending:
         return {"success": True, "sent": 0, "message": "No pending emails"}
@@ -2172,6 +2176,7 @@ async def approve_all_outreach(user: dict = Depends(get_current_user)):
     logging.info(f"[APPROVE-ALL] Email key found: {bool(email_key)}, provider: {email_provider}")
     
     if not email_key:
+        logging.error(f"[APPROVE-ALL] No email key for user {user['id'][:8]}")
         raise HTTPException(status_code=400, detail="Nu ai configurat o cheie API pentru email (Resend sau SendGrid). Mergi la Chei API pentru a adăuga una.")
     
     sent_count = 0
@@ -2902,10 +2907,14 @@ async def trigger_backlink_outreach(
                 "domain": {"$nin": contacted_domains}
             }, {"_id": 0}).to_list(remaining_emails)
             
+            logging.info(f"[MANUAL OUTREACH] Site {site_name}: Found {len(free_opportunities)} free opportunities to contact")
+            
             articles = await db.articles.find(
                 {"user_id": user_id, "site_id": site_id, "status": "published"},
                 {"_id": 0, "id": 1, "title": 1, "wordpress_url": 1}
             ).sort("created_at", -1).to_list(20)
+            
+            logging.info(f"[MANUAL OUTREACH] Site {site_name}: Found {len(articles)} published articles")
             
             if not articles:
                 articles = [{"id": "placeholder", "title": f"Content on {site_name}", "wordpress_url": site.get("site_url", "")}]
