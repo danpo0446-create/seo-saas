@@ -12,7 +12,17 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 ### Backend (FastAPI)
 ```
 /app/backend/
-├── server.py              # Main FastAPI app with all routes
+├── server.py              # Main FastAPI app (~9675 lines, reduced from ~10111)
+├── database.py            # MongoDB connection module
+├── config.py              # Configuration and constants
+├── routes/
+│   ├── __init__.py        # Route exports
+│   ├── auth.py            # Authentication routes (JWT, login, register)
+│   ├── pagespeed.py       # PageSpeed Insights routes
+│   ├── dashboard.py       # Dashboard statistics routes
+│   ├── settings.py        # User settings routes
+│   ├── calendar.py        # Calendar routes (not yet integrated - circular deps)
+│   └── keywords.py        # Keywords routes (not yet integrated - circular deps)
 ├── saas/
 │   ├── plans.py           # Plan definitions and limits
 │   ├── models.py          # Pydantic models for SaaS
@@ -21,6 +31,9 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 │   ├── subscription_service.py  # Business logic for subscriptions
 │   ├── email_service.py   # Email notifications (Resend)
 │   └── invoice_service.py # PDF invoice generation
+├── services/
+│   ├── social_posting.py  # Facebook/LinkedIn posting
+│   └── seo_analysis.py    # SEO analysis utilities
 └── .env                   # Environment variables
 ```
 
@@ -52,7 +65,21 @@ Collections:
 
 ## What's Been Implemented
 
-### Date: 2026-04-03 (Latest)
+### Date: 2026-04-11 (Latest)
+
+#### Backend Refactoring - Phase 1 ✅
+- **REFACTORED** Extracted modular routes from `server.py` (~436 lines moved)
+- **NEW** `/app/backend/routes/` directory with modular route handlers
+- **NEW** `routes/pagespeed.py` - PageSpeed Insights routes (326 lines)
+- **NEW** `routes/dashboard.py` - Dashboard statistics routes (125 lines)
+- **NEW** `routes/settings.py` - User settings routes (71 lines)
+- **NEW** `routes/auth.py` - Authentication routes (118 lines)
+- **NEW** `database.py` - MongoDB connection module
+- **NEW** `config.py` - Configuration and constants
+- **REDUCED** `server.py` from ~10111 to ~9675 lines
+- Routes `calendar.py` and `keywords.py` created but not integrated (circular dependencies with `get_user_llm_key`)
+
+### Date: 2026-04-03
 
 #### Notification Center ✅
 - **NEW** Componentă `NotificationCenter.jsx` - dropdown cu notificări în header
