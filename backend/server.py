@@ -62,9 +62,9 @@ from saas.plans import get_plan, PLANS
 
 # Import modular routes
 from routes import (
-    pagespeed_router, dashboard_router, settings_router
+    pagespeed_router, dashboard_router, settings_router,
+    notifications_router, trends_router, templates_router
 )
-# calendar_router și keywords_router necesită refactorizare pentru a evita dependențe circulare
 
 # Helper function to get user's API key (BYOAK first, then platform fallback for admin/test)
 async def get_user_llm_key(user_id: str, is_admin: bool = False, user_email: str = ""):
@@ -1242,57 +1242,7 @@ async def delete_keyword(keyword_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Keyword not found")
     return {"message": "Keyword deleted"}
 
-# ============ GOOGLE TRENDS ROUTES ============
-
-@api_router.get("/trends/trending")
-async def get_trending_searches(user: dict = Depends(get_current_user)):
-    """Get current trending searches in Romania"""
-    try:
-        trends = GoogleTrendsService()
-        trending = trends.get_trending_searches()
-        return {"trending": trending, "count": len(trending)}
-    except Exception as e:
-        logging.error(f"[TRENDS] Error: {e}")
-        return {"trending": [], "count": 0, "error": str(e)}
-
-@api_router.get("/trends/niche/{niche}")
-async def get_trends_for_niche(niche: str, user: dict = Depends(get_current_user)):
-    """Get trending topics relevant to a specific niche"""
-    try:
-        result = get_trending_topics_for_niche(niche)
-        return result
-    except Exception as e:
-        logging.error(f"[TRENDS] Error for niche '{niche}': {e}")
-        return {"niche": niche, "error": str(e), "topic_ideas": []}
-
-@api_router.post("/trends/score-keywords")
-async def score_keywords(keywords: List[str], user: dict = Depends(get_current_user)):
-    """Score keywords by their trending interest"""
-    try:
-        if not keywords:
-            return {"scored_keywords": []}
-        scored = score_keywords_by_trend(keywords[:20])  # Limit to 20
-        return {"scored_keywords": scored}
-    except Exception as e:
-        logging.error(f"[TRENDS] Error scoring keywords: {e}")
-        return {"scored_keywords": [], "error": str(e)}
-
-@api_router.get("/trends/related/{keyword}")
-async def get_related_queries(keyword: str, user: dict = Depends(get_current_user)):
-    """Get related queries for a keyword"""
-    try:
-        trends = GoogleTrendsService()
-        related = trends.get_related_queries(keyword)
-        suggestions = trends.get_suggestions(keyword)
-        return {
-            "keyword": keyword,
-            "top_queries": related.get("top", []),
-            "rising_queries": related.get("rising", []),
-            "suggestions": suggestions
-        }
-    except Exception as e:
-        logging.error(f"[TRENDS] Error for keyword '{keyword}': {e}")
-        return {"keyword": keyword, "error": str(e)}
+# Google Trends routes moved to routes/trends.py
 
 # ============ REPORTS ROUTES ============
 
@@ -5352,110 +5302,8 @@ async def get_social_posts(site_id: str, user: dict = Depends(get_current_user))
 
 # Settings routes moved to routes/settings.py
 
-# ============ ARTICLE TEMPLATES ============
-
-@api_router.post("/templates", response_model=ArticleTemplateResponse)
-async def create_template(template: ArticleTemplateCreate, user: dict = Depends(get_current_user)):
-    """Create a new article template"""
-    template_id = str(uuid.uuid4())
-    template_doc = {
-        "id": template_id,
-        "name": template.name,
-        "description": template.description,
-        "default_tone": template.default_tone,
-        "default_length": template.default_length,
-        "prompt_template": template.prompt_template,
-        "keywords_hint": template.keywords_hint or "",
-        "user_id": user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.article_templates.insert_one(template_doc)
-    return ArticleTemplateResponse(**template_doc)
-
-@api_router.get("/templates", response_model=List[ArticleTemplateResponse])
-async def get_templates(user: dict = Depends(get_current_user)):
-    """Get all article templates for user"""
-    templates = await db.article_templates.find({"user_id": user["id"]}, {"_id": 0}).to_list(100)
-    
-    # Add default templates if user has none
-    if not templates:
-        default_templates = [
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Ghid Complet",
-                "description": "Articol detaliat tip ghid pas cu pas",
-                "default_tone": "professional",
-                "default_length": "long",
-                "prompt_template": "Scrie un ghid complet și detaliat despre {topic}. Include: introducere, pași clari, exemple practice, sfaturi pro, și o concluzie cu call-to-action.",
-                "keywords_hint": "ghid, tutorial, cum să, pași",
-                "user_id": user["id"],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Listicle (Top X)",
-                "description": "Articol în format listă cu puncte",
-                "default_tone": "casual",
-                "default_length": "medium",
-                "prompt_template": "Scrie un articol în format listă despre {topic}. Include minim 7-10 puncte, fiecare cu titlu și descriere detaliată. Adaugă introducere captivantă și concluzie.",
-                "keywords_hint": "top, cele mai bune, listă, recomandări",
-                "user_id": user["id"],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Comparație Produse",
-                "description": "Articol comparativ între opțiuni",
-                "default_tone": "authoritative",
-                "default_length": "long",
-                "prompt_template": "Scrie o comparație detaliată despre {topic}. Include: criterii de evaluare, avantaje și dezavantaje pentru fiecare opțiune, tabel comparativ, și recomandare finală.",
-                "keywords_hint": "vs, comparație, care e mai bun, diferențe",
-                "user_id": user["id"],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "How-To Rapid",
-                "description": "Tutorial scurt și la obiect",
-                "default_tone": "friendly",
-                "default_length": "short",
-                "prompt_template": "Scrie un tutorial scurt și practic despre {topic}. Mergi direct la subiect cu pași simpli și clari. Include sfaturi rapide la final.",
-                "keywords_hint": "cum să, rapid, simplu, ușor",
-                "user_id": user["id"],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Recenzie Expert",
-                "description": "Review detaliat cu analiză",
-                "default_tone": "authoritative",
-                "default_length": "medium",
-                "prompt_template": "Scrie o recenzie expertă despre {topic}. Include: prezentare generală, caracteristici cheie, pro și contra, pentru cine e potrivit, verdict final cu scor.",
-                "keywords_hint": "recenzie, review, părere, experiență",
-                "user_id": user["id"],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-        ]
-        await db.article_templates.insert_many(default_templates)
-        templates = default_templates
-    
-    return [ArticleTemplateResponse(**t) for t in templates]
-
-@api_router.get("/templates/{template_id}", response_model=ArticleTemplateResponse)
-async def get_template(template_id: str, user: dict = Depends(get_current_user)):
-    """Get a specific template"""
-    template = await db.article_templates.find_one({"id": template_id, "user_id": user["id"]}, {"_id": 0})
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return ArticleTemplateResponse(**template)
-
-@api_router.delete("/templates/{template_id}")
-async def delete_template(template_id: str, user: dict = Depends(get_current_user)):
-    """Delete a template"""
-    result = await db.article_templates.delete_one({"id": template_id, "user_id": user["id"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return {"message": "Template deleted"}
+# Templates CRUD routes moved to routes/templates.py
+# (generate-from-template rămâne aici pentru dependența LLM)
 
 @api_router.post("/articles/generate-from-template", response_model=ArticleResponse)
 async def generate_article_from_template(
@@ -8300,60 +8148,7 @@ async def create_notification(user_id: str, title: str, message: str, notificati
     logging.info(f"[NOTIFICATION] Created {notification_type} notification for user {user_id}: {title}")
     return notification
 
-@api_router.get("/notifications")
-async def get_notifications(user: dict = Depends(get_current_user)):
-    """Get all notifications for the current user"""
-    notifications = await db.notifications.find(
-        {"user_id": user["id"]},
-        {"_id": 0}
-    ).sort("created_at", -1).limit(50).to_list(50)
-    
-    unread_count = await db.notifications.count_documents({
-        "user_id": user["id"],
-        "read": False
-    })
-    
-    return {
-        "notifications": notifications,
-        "unread_count": unread_count
-    }
-
-@api_router.put("/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
-    """Mark a single notification as read"""
-    result = await db.notifications.update_one(
-        {"id": notification_id, "user_id": user["id"]},
-        {"$set": {"read": True}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    return {"success": True}
-
-@api_router.put("/notifications/read-all")
-async def mark_all_notifications_read(user: dict = Depends(get_current_user)):
-    """Mark all notifications as read for the current user"""
-    result = await db.notifications.update_many(
-        {"user_id": user["id"], "read": False},
-        {"$set": {"read": True}}
-    )
-    return {"success": True, "updated_count": result.modified_count}
-
-@api_router.delete("/notifications/{notification_id}")
-async def delete_notification(notification_id: str, user: dict = Depends(get_current_user)):
-    """Delete a single notification"""
-    result = await db.notifications.delete_one({
-        "id": notification_id,
-        "user_id": user["id"]
-    })
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    return {"success": True}
-
-@api_router.delete("/notifications/clear-all")
-async def clear_all_notifications(user: dict = Depends(get_current_user)):
-    """Delete all notifications for the current user"""
-    result = await db.notifications.delete_many({"user_id": user["id"]})
-    return {"success": True, "deleted_count": result.deleted_count}
+# Notifications routes moved to routes/notifications.py
 
 # Dashboard routes moved to routes/dashboard.py
 
@@ -8361,7 +8156,9 @@ async def clear_all_notifications(user: dict = Depends(get_current_user)):
 api_router.include_router(pagespeed_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(settings_router)
-# calendar și keywords rămân în server.py (dependențe cu get_user_llm_key)
+api_router.include_router(notifications_router)
+api_router.include_router(trends_router)
+api_router.include_router(templates_router)
 
 # Include routers
 app.include_router(api_router)
