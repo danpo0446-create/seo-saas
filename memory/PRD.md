@@ -12,17 +12,22 @@ Implementare aplicație SaaS pe branch separat conform specificațiilor pentru S
 ### Backend (FastAPI)
 ```
 /app/backend/
-├── server.py              # Main FastAPI app (~9675 lines, reduced from ~10111)
+├── server.py              # Main FastAPI app (~9170 lines, reduced from ~10111)
 ├── database.py            # MongoDB connection module
 ├── config.py              # Configuration and constants
-├── routes/
+├── routes/                # 12 modular route handlers (1384 lines total)
 │   ├── __init__.py        # Route exports
 │   ├── auth.py            # Authentication routes (JWT, login, register)
 │   ├── pagespeed.py       # PageSpeed Insights routes
 │   ├── dashboard.py       # Dashboard statistics routes
 │   ├── settings.py        # User settings routes
-│   ├── calendar.py        # Calendar routes (not yet integrated - circular deps)
-│   └── keywords.py        # Keywords routes (not yet integrated - circular deps)
+│   ├── notifications.py   # User notifications CRUD
+│   ├── trends.py          # Google Trends integration
+│   ├── templates.py       # Article templates CRUD
+│   ├── articles.py        # Articles CRUD (generate stays in server.py)
+│   ├── keywords.py        # Keywords CRUD (research stays in server.py)
+│   ├── calendar.py        # Calendar CRUD (generate-90-days stays in server.py)
+│   └── reports.py         # Weekly/Monthly reports
 ├── saas/
 │   ├── plans.py           # Plan definitions and limits
 │   ├── models.py          # Pydantic models for SaaS
@@ -67,9 +72,9 @@ Collections:
 
 ### Date: 2026-04-11 (Latest)
 
-#### Backend Refactoring - Phase 1 & 2 ✅
-- **REFACTORED** Extracted modular routes from `server.py` (~639 lines moved)
-- **NEW** `/app/backend/routes/` directory with modular route handlers
+#### Backend Refactoring - Phase 1, 2 & 3 ✅ COMPLETE
+- **REFACTORED** Extracted modular routes from `server.py` (~941 lines moved)
+- **NEW** `/app/backend/routes/` directory with 12 modular route handlers
 - **Phase 1:**
   - `routes/pagespeed.py` (326 lines) - PageSpeed Insights
   - `routes/dashboard.py` (125 lines) - Dashboard statistics  
@@ -79,9 +84,15 @@ Collections:
   - `routes/notifications.py` (72 lines) - User notifications CRUD
   - `routes/trends.py` (67 lines) - Google Trends integration
   - `routes/templates.py` (142 lines) - Article templates CRUD
+- **Phase 3:**
+  - `routes/articles.py` (112 lines) - Articles CRUD
+  - `routes/keywords.py` (43 lines) - Keywords CRUD
+  - `routes/calendar.py` (84 lines) - Calendar CRUD
+  - `routes/reports.py` (205 lines) - Weekly/Monthly reports
 - **NEW** `database.py` - MongoDB connection module
 - **NEW** `config.py` - Configuration constants
-- **REDUCED** `server.py` from ~10111 to ~9472 lines
+- **REDUCED** `server.py` from ~10111 to ~9170 lines (941 lines removed)
+- **NOTE:** LLM-dependent routes (generate, research, generate-90-days) remain in server.py
 
 ### Date: 2026-04-03
 
@@ -243,10 +254,9 @@ Collections:
 - ✅ Admin password reset for users
 - ✅ Facebook Page Selection UI
 - ✅ Scheduler reliability improvements (misfire_grace_time, daily recovery)
-- ✅ Backend refactoring Phase 1 & 2 (pagespeed, dashboard, settings, notifications, trends, templates)
+- ✅ Backend refactoring COMPLETE (12 modules in routes/)
 
 ### P1 (High) - Pending
-- [ ] Backend refactoring Phase 3 (extract articles CRUD, wordpress CRUD - fără LLM)
 - [ ] Verificare email sending reliability (Resend/SendGrid) via BYOAK
 - [ ] Configure production Stripe keys on VPS
 - [ ] Configure RESEND_API_KEY on VPS for email notifications
