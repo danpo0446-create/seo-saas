@@ -7792,42 +7792,41 @@ Continuă:"""
     
     # Send email notification - ONLY if email_notification setting is enabled
     should_send_email = settings.get("email_notification", True)
+    logging.info(f"[AUTOMATION] Site {site_name}: Email check - should_send={should_send_email}, notification_email={notification_email[:20] if notification_email else 'NONE'}...")
+    
     if should_send_email and notification_email:
         try:
             # Get user's email key (BYOAK)
             email_key, email_provider = await get_user_email_key(user_id, False, notification_email)
+            logging.info(f"[AUTOMATION] Site {site_name}: Email key found={bool(email_key)}, provider={email_provider}")
             
             if email_key:
                 status_text = "Publicat pe WordPress" if publish_success else "Salvat ca Draft"
                 email_html = f"""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #00E676;">🤖 Articol Generat Automat</h2>
+                    <h2 style="color: #00E676;">Articol Generat Automat</h2>
                     <p>Un nou articol a fost generat pentru <strong>{site_name}</strong>:</p>
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
                         <h3 style="margin: 0 0 10px 0;">{title}</h3>
                         <p style="margin: 5px 0;"><strong>Categorie:</strong> {category}</p>
                         <p style="margin: 5px 0;"><strong>Cuvinte:</strong> {word_count}</p>
-                        <p style="margin: 5px 0;"><strong>Keywords:</strong> {', '.join(keywords)}</p>
+                        <p style="margin: 5px 0;"><strong>Keywords:</strong> {', '.join(keywords[:5])}</p>
                         <p style="margin: 5px 0;"><strong>Status:</strong> {status_text}</p>
-                        <p style="margin: 5px 0;"><strong>Linkuri produse:</strong> {'Da' if settings.get('include_product_links') else 'Nu'}</p>
-                        {f'<p style="margin: 10px 0 0 0;"><a href="{wp_url}" style="color: #00E676; font-weight: bold;">Vizualizează articolul →</a></p>' if wp_url else ''}
+                        {f'<p style="margin: 10px 0 0 0;"><a href="{wp_url}" style="color: #00E676; font-weight: bold;">Vizualizează articolul</a></p>' if wp_url else ''}
                     </div>
                     <p>Accesează aplicația pentru a gestiona articolele.</p>
-                    <p style="color: #888; font-size: 12px; margin-top: 30px;">
-                        Generat automat de SEO Automation Platform
-                    </p>
                 </div>
                 """
                 
                 import resend as resend_lib
                 resend_lib.api_key = email_key
-                resend_lib.Emails.send({
+                result = resend_lib.Emails.send({
                     "from": SENDER_EMAIL,
                     "to": notification_email,
-                    "subject": f"🤖 Articol nou: {title[:50]}",
+                    "subject": f"Articol nou: {title[:50]}",
                     "html": email_html
                 })
-                logging.info(f"[AUTOMATION] Site {site_name}: Email notification sent to {notification_email}")
+                logging.info(f"[AUTOMATION] Site {site_name}: Email SENT to {notification_email}, result: {result}")
             else:
                 logging.warning(f"[AUTOMATION] Site {site_name}: No email key configured, skipping notification")
         except Exception as e:
