@@ -1202,6 +1202,14 @@ export default function AutomationPage() {
                     placeholder="https://saas.seamanshelp.com/&#10;https://saas.seamanshelp.com/#features&#10;https://martechassistance.com/&#10;https://martechassistance.com/servicii/"
                     value={(editSettings.internal_links || []).join('\n')}
                     onChange={(e) => {
+                      // Keep raw value to allow typing on new lines
+                      const rawValue = e.target.value;
+                      // Only filter empty lines when saving, not while typing
+                      const links = rawValue.split('\n');
+                      setEditSettings({ ...editSettings, internal_links: links });
+                    }}
+                    onBlur={(e) => {
+                      // Clean up empty lines only when leaving the field
                       const links = e.target.value.split('\n').filter(l => l.trim());
                       setEditSettings({ ...editSettings, internal_links: links });
                     }}
