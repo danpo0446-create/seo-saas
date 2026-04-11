@@ -63,7 +63,8 @@ from saas.plans import get_plan, PLANS
 # Import modular routes
 from routes import (
     pagespeed_router, dashboard_router, settings_router,
-    notifications_router, trends_router, templates_router
+    notifications_router, trends_router, templates_router,
+    articles_router, keywords_router, calendar_router, reports_router
 )
 
 # Helper function to get user's API key (BYOAK first, then platform fallback for admin/test)
@@ -1090,69 +1091,8 @@ Continuă:"""
         logging.error(f"Article regeneration error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to regenerate article: {str(e)}")
 
-@api_router.get("/articles", response_model=List[ArticleResponse])
-async def get_articles(site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    query = {"user_id": user["id"]}
-    if site_id:
-        query["site_id"] = site_id
-        logging.info(f"[ARTICLES] Filtering by site_id: {site_id}")
-    else:
-        logging.info(f"[ARTICLES] No site_id filter, returning all articles")
-    articles = await db.articles.find(query, {"_id": 0}).to_list(1000)
-    logging.info(f"[ARTICLES] Returning {len(articles)} articles")
-    return [ArticleResponse(**a) for a in articles]
-
-@api_router.get("/articles/{article_id}", response_model=ArticleResponse)
-async def get_article(article_id: str, user: dict = Depends(get_current_user)):
-    article = await db.articles.find_one({"id": article_id, "user_id": user["id"]}, {"_id": 0})
-    if not article:
-        raise HTTPException(status_code=404, detail="Article not found")
-    return ArticleResponse(**article)
-
-@api_router.put("/articles/{article_id}", response_model=ArticleResponse)
-async def update_article(article_id: str, updates: ArticleUpdate, user: dict = Depends(get_current_user)):
-    """Update article title, content, keywords or status"""
-    article = await db.articles.find_one({"id": article_id, "user_id": user["id"]}, {"_id": 0})
-    if not article:
-        raise HTTPException(status_code=404, detail="Article not found")
-    
-    update_data = {}
-    if updates.title is not None:
-        update_data["title"] = updates.title
-    if updates.content is not None:
-        update_data["content"] = updates.content
-        update_data["word_count"] = len(updates.content.split())
-    if updates.keywords is not None:
-        update_data["keywords"] = updates.keywords
-    if updates.status is not None:
-        update_data["status"] = updates.status
-    
-    if update_data:
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        await db.articles.update_one(
-            {"id": article_id, "user_id": user["id"]},
-            {"$set": update_data}
-        )
-    
-    updated_article = await db.articles.find_one({"id": article_id}, {"_id": 0})
-    return ArticleResponse(**updated_article)
-
-@api_router.patch("/articles/{article_id}/status")
-async def update_article_status(article_id: str, status: str, user: dict = Depends(get_current_user)):
-    result = await db.articles.update_one(
-        {"id": article_id, "user_id": user["id"]},
-        {"$set": {"status": status}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Article not found")
-    return {"message": "Status updated"}
-
-@api_router.delete("/articles/{article_id}")
-async def delete_article(article_id: str, user: dict = Depends(get_current_user)):
-    result = await db.articles.delete_one({"id": article_id, "user_id": user["id"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Article not found")
-    return {"message": "Article deleted"}
+# Articles CRUD routes moved to routes/articles.py
+# (generate și regenerate rămân aici pentru LLM)
 
 # ============ KEYWORDS ROUTES ============
 
@@ -1227,261 +1167,15 @@ JSON array only, no explanation:"""
         logging.error(f"Keyword research error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to research keywords: {str(e)}")
 
-@api_router.get("/keywords", response_model=List[KeywordResponse])
-async def get_keywords(site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    query = {"user_id": user["id"]}
-    if site_id:
-        query["site_id"] = site_id
-    keywords = await db.keywords.find(query, {"_id": 0}).to_list(1000)
-    return [KeywordResponse(**k) for k in keywords]
-
-@api_router.delete("/keywords/{keyword_id}")
-async def delete_keyword(keyword_id: str, user: dict = Depends(get_current_user)):
-    result = await db.keywords.delete_one({"id": keyword_id, "user_id": user["id"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Keyword not found")
-    return {"message": "Keyword deleted"}
+# Keywords CRUD routes moved to routes/keywords.py
+# (research rămâne aici pentru LLM)
 
 # Google Trends routes moved to routes/trends.py
 
-# ============ REPORTS ROUTES ============
+# Reports routes moved to routes/reports.py
 
-@api_router.get("/reports/weekly")
-async def get_weekly_report(user: dict = Depends(get_current_user)):
-    """Get weekly performance report"""
-    user_id = user["id"]
-    
-    # Get user's sites
-    sites = await db.wordpress_configs.find(
-        {"user_id": user_id},
-        {"_id": 0, "app_password": 0}
-    ).to_list(100)
-    
-    # Calculate stats for last 7 days
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    
-    # Get all articles from last 7 days
-    recent_articles = await db.articles.find({
-        "user_id": user_id,
-        "created_at": {"$gte": seven_days_ago.isoformat()}
-    }, {"_id": 0}).to_list(1000)
-    
-    # Count by article type
-    article_types_count = {}
-    for art in recent_articles:
-        art_type = art.get("article_type", "general")
-        article_types_count[art_type] = article_types_count.get(art_type, 0) + 1
-    
-    # Count with product links
-    with_products = sum(1 for a in recent_articles if a.get("has_product_links"))
-    
-    # Count with trending keywords
-    with_trending = sum(1 for a in recent_articles if a.get("has_trending_keywords"))
-    
-    # Published count
-    published = sum(1 for a in recent_articles if a.get("status") == "published")
-    
-    # Draft count
-    drafts = sum(1 for a in recent_articles if a.get("status") == "draft")
-    
-    # Average SEO score
-    seo_scores = [a.get("seo_score", 0) for a in recent_articles if a.get("seo_score")]
-    avg_seo_score = round(sum(seo_scores) / len(seo_scores), 1) if seo_scores else 0
-    
-    # Average word count
-    word_counts = [a.get("word_count", 0) for a in recent_articles if a.get("word_count")]
-    avg_word_count = round(sum(word_counts) / len(word_counts)) if word_counts else 0
-    
-    # Stats per site
-    sites_stats = []
-    for site in sites:
-        site_articles = [a for a in recent_articles if a.get("site_id") == site["id"]]
-        site_published = sum(1 for a in site_articles if a.get("status") == "published")
-        site_drafts = sum(1 for a in site_articles if a.get("status") == "draft")
-        sites_stats.append({
-            "site_id": site["id"],
-            "site_name": site.get("site_name") or site.get("site_url"),
-            "articles_generated": len(site_articles),
-            "articles_published": site_published,
-            "articles_draft": site_drafts
-        })
-    
-    # Daily breakdown
-    daily_stats = {}
-    for art in recent_articles:
-        created = art.get("created_at", "")[:10]  # Get date part
-        if created not in daily_stats:
-            daily_stats[created] = {"generated": 0, "published": 0}
-        daily_stats[created]["generated"] += 1
-        if art.get("status") == "published":
-            daily_stats[created]["published"] += 1
-    
-    return {
-        "period": {
-            "start": seven_days_ago.isoformat(),
-            "end": datetime.now(timezone.utc).isoformat(),
-            "days": 7
-        },
-        "summary": {
-            "total_articles": len(recent_articles),
-            "published": published,
-            "drafts": drafts,
-            "with_product_links": with_products,
-            "with_trending_keywords": with_trending,
-            "avg_seo_score": avg_seo_score,
-            "avg_word_count": avg_word_count
-        },
-        "article_types": article_types_count,
-        "sites_stats": sites_stats,
-        "daily_stats": daily_stats
-    }
-
-@api_router.get("/reports/monthly")
-async def get_monthly_report(user: dict = Depends(get_current_user)):
-    """Get monthly performance report"""
-    user_id = user["id"]
-    
-    # Get user's sites
-    sites = await db.wordpress_configs.find(
-        {"user_id": user_id},
-        {"_id": 0, "app_password": 0}
-    ).to_list(100)
-    
-    # Calculate stats for last 30 days
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    
-    # Get all articles from last 30 days
-    recent_articles = await db.articles.find({
-        "user_id": user_id,
-        "created_at": {"$gte": thirty_days_ago.isoformat()}
-    }, {"_id": 0}).to_list(1000)
-    
-    # Count by article type
-    article_types_count = {}
-    for art in recent_articles:
-        art_type = art.get("article_type", "general")
-        article_types_count[art_type] = article_types_count.get(art_type, 0) + 1
-    
-    # Counts
-    with_products = sum(1 for a in recent_articles if a.get("has_product_links"))
-    with_trending = sum(1 for a in recent_articles if a.get("has_trending_keywords"))
-    published = sum(1 for a in recent_articles if a.get("status") == "published")
-    drafts = sum(1 for a in recent_articles if a.get("status") == "draft")
-    auto_generated = sum(1 for a in recent_articles if a.get("auto_generated"))
-    
-    # Averages
-    seo_scores = [a.get("seo_score", 0) for a in recent_articles if a.get("seo_score")]
-    avg_seo_score = round(sum(seo_scores) / len(seo_scores), 1) if seo_scores else 0
-    word_counts = [a.get("word_count", 0) for a in recent_articles if a.get("word_count")]
-    avg_word_count = round(sum(word_counts) / len(word_counts)) if word_counts else 0
-    
-    # Outreach stats
-    outreach_sent = await db.backlink_outreach.count_documents({
-        "user_id": user_id,
-        "status": "sent"
-    })
-    outreach_pending = await db.backlink_outreach.count_documents({
-        "user_id": user_id,
-        "status": "pending_approval"
-    })
-    
-    # Stats per site
-    sites_stats = []
-    for site in sites:
-        site_articles = [a for a in recent_articles if a.get("site_id") == site["id"]]
-        site_published = sum(1 for a in site_articles if a.get("status") == "published")
-        sites_stats.append({
-            "site_id": site["id"],
-            "site_name": site.get("site_name") or site.get("site_url"),
-            "articles_generated": len(site_articles),
-            "articles_published": site_published
-        })
-    
-    # Weekly breakdown
-    weekly_stats = {}
-    for art in recent_articles:
-        created = art.get("created_at", "")
-        if created:
-            try:
-                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                week_num = dt.isocalendar()[1]
-                week_key = f"Săpt. {week_num}"
-                if week_key not in weekly_stats:
-                    weekly_stats[week_key] = {"generated": 0, "published": 0}
-                weekly_stats[week_key]["generated"] += 1
-                if art.get("status") == "published":
-                    weekly_stats[week_key]["published"] += 1
-            except:
-                pass
-    
-    return {
-        "period": {
-            "start": thirty_days_ago.isoformat(),
-            "end": datetime.now(timezone.utc).isoformat(),
-            "days": 30
-        },
-        "summary": {
-            "total_articles": len(recent_articles),
-            "auto_generated": auto_generated,
-            "published": published,
-            "drafts": drafts,
-            "with_product_links": with_products,
-            "with_trending_keywords": with_trending,
-            "avg_seo_score": avg_seo_score,
-            "avg_word_count": avg_word_count
-        },
-        "outreach": {
-            "emails_sent": outreach_sent,
-            "pending_approval": outreach_pending
-        },
-        "article_types": article_types_count,
-        "sites_stats": sites_stats,
-        "weekly_stats": weekly_stats
-    }
-
-# ============ CALENDAR ROUTES ============
-
-@api_router.post("/calendar", response_model=CalendarResponse)
-async def create_calendar_entry(entry: CalendarEntry, user: dict = Depends(get_current_user)):
-    entry_id = str(uuid.uuid4())
-    entry_doc = {
-        "id": entry_id,
-        "title": entry.title,
-        "keywords": entry.keywords,
-        "scheduled_date": entry.scheduled_date,
-        "status": entry.status,
-        "article_id": None,
-        "user_id": user["id"],
-        "site_id": entry.site_id
-    }
-    await db.calendar.insert_one(entry_doc)
-    return CalendarResponse(**entry_doc)
-
-@api_router.get("/calendar", response_model=List[CalendarResponse])
-async def get_calendar(site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    query = {"user_id": user["id"]}
-    if site_id:
-        query["site_id"] = site_id
-    entries = await db.calendar.find(query, {"_id": 0}).to_list(1000)
-    return [CalendarResponse(**e) for e in entries]
-
-@api_router.patch("/calendar/{entry_id}")
-async def update_calendar_entry(entry_id: str, entry: CalendarEntry, user: dict = Depends(get_current_user)):
-    update_data = entry.model_dump(exclude_unset=True)
-    result = await db.calendar.update_one(
-        {"id": entry_id, "user_id": user["id"]},
-        {"$set": update_data}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return {"message": "Entry updated"}
-
-@api_router.delete("/calendar/{entry_id}")
-async def delete_calendar_entry(entry_id: str, user: dict = Depends(get_current_user)):
-    result = await db.calendar.delete_one({"id": entry_id, "user_id": user["id"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return {"message": "Entry deleted"}
+# Calendar CRUD routes moved to routes/calendar.py
+# (generate-90-days rămâne aici pentru LLM)
 
 @api_router.post("/calendar/generate-90-days")
 async def generate_90_day_calendar(niche: str, site_id: Optional[str] = None, user: dict = Depends(get_current_user)):
@@ -8159,6 +7853,10 @@ api_router.include_router(settings_router)
 api_router.include_router(notifications_router)
 api_router.include_router(trends_router)
 api_router.include_router(templates_router)
+api_router.include_router(articles_router)
+api_router.include_router(keywords_router)
+api_router.include_router(calendar_router)
+api_router.include_router(reports_router)
 
 # Include routers
 app.include_router(api_router)
