@@ -239,8 +239,10 @@ Collections:
 - ✅ Admin password reset for users
 - ✅ Facebook Page Selection UI
 - ✅ Scheduler reliability improvements (misfire_grace_time, daily recovery)
+- ✅ Backend refactoring Phase 1 (routes/pagespeed, routes/dashboard, routes/settings)
 
 ### P1 (High) - Pending
+- [ ] Backend refactoring Phase 2 (extract articles, backlinks, gsc, social routes)
 - [ ] Verificare email sending reliability (Resend/SendGrid) via BYOAK
 - [ ] Configure production Stripe keys on VPS
 - [ ] Configure RESEND_API_KEY on VPS for email notifications
