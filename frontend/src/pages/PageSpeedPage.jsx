@@ -411,17 +411,27 @@ const PageSpeedPage = () => {
               ) : (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData.filter(d => d.performance_mobile !== null || d.performance_desktop !== null)}>
+                    <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                       <XAxis 
                         dataKey="date" 
                         stroke="#888"
-                        tick={{ fill: '#aaa', fontSize: 12 }}
+                        tick={{ fill: '#aaa', fontSize: 11 }}
+                        interval="preserveStartEnd"
+                        tickFormatter={(value, index) => {
+                          // Show fewer labels on X axis
+                          const totalPoints = chartData.length;
+                          if (totalPoints <= 10) return value;
+                          if (index === 0 || index === totalPoints - 1) return value;
+                          if (index % Math.ceil(totalPoints / 6) === 0) return value;
+                          return '';
+                        }}
                       />
                       <YAxis 
                         domain={[0, 100]}
                         stroke="#888"
                         tick={{ fill: '#aaa', fontSize: 12 }}
+                        tickCount={6}
                       />
                       <Tooltip 
                         contentStyle={{ 
@@ -431,6 +441,7 @@ const PageSpeedPage = () => {
                           color: '#fff'
                         }}
                         labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+                        formatter={(value) => value !== null ? `${value}%` : 'N/A'}
                       />
                       <Legend 
                         wrapperStyle={{ paddingTop: '10px' }}
@@ -440,9 +451,13 @@ const PageSpeedPage = () => {
                         dataKey="performance_mobile"
                         name="Performance Mobile"
                         stroke="#22c55e"
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 8, fill: '#22c55e', stroke: '#fff', strokeWidth: 2 }}
+                        strokeWidth={2}
+                        dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          if (payload.performance_mobile === null) return null;
+                          return <circle cx={cx} cy={cy} r={4} fill="#22c55e" stroke="#fff" strokeWidth={2} />;
+                        }}
+                        activeDot={{ r: 6, fill: '#22c55e', stroke: '#fff', strokeWidth: 2 }}
                         connectNulls={true}
                       />
                       <Line 
@@ -450,9 +465,13 @@ const PageSpeedPage = () => {
                         dataKey="performance_desktop"
                         name="Performance Desktop"
                         stroke="#3b82f6"
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 8, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                        strokeWidth={2}
+                        dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          if (payload.performance_desktop === null) return null;
+                          return <circle cx={cx} cy={cy} r={4} fill="#3b82f6" stroke="#fff" strokeWidth={2} />;
+                        }}
+                        activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
                         connectNulls={true}
                       />
                       <Line 
@@ -460,9 +479,13 @@ const PageSpeedPage = () => {
                         dataKey="seo_mobile"
                         name="SEO Mobile"
                         stroke="#eab308"
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: '#eab308', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 8, fill: '#eab308', stroke: '#fff', strokeWidth: 2 }}
+                        strokeWidth={2}
+                        dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          if (payload.seo_mobile === null) return null;
+                          return <circle cx={cx} cy={cy} r={4} fill="#eab308" stroke="#fff" strokeWidth={2} />;
+                        }}
+                        activeDot={{ r: 6, fill: '#eab308', stroke: '#fff', strokeWidth: 2 }}
                         connectNulls={true}
                       />
                     </LineChart>
