@@ -6474,7 +6474,18 @@ async def generate_article_now(site_id: Optional[str] = None, user: dict = Depen
     if not site:
         raise HTTPException(status_code=404, detail="No WordPress site found")
     
-    article = await generate_automated_article(site, user["id"])
+    # Get settings for this site to use correct article_length, internal_links, etc.
+    settings = await db.site_automation_settings.find_one(
+        {"site_id": site["id"], "user_id": user["id"]},
+        {"_id": 0}
+    )
+    
+    if settings:
+        # Use the full settings version
+        article = await generate_automated_article_with_settings(site, user["id"], settings)
+    else:
+        # Fallback to default if no settings
+        article = await generate_automated_article(site, user["id"])
     
     if article:
         return {"message": "Article generated successfully", "article_id": article["id"], "title": article["title"]}
@@ -7415,6 +7426,9 @@ async def update_site_automation_settings(
         "include_product_links": settings.include_product_links,
         "product_links_source": settings.product_links_source,
         "max_product_links": settings.max_product_links,
+        "internal_links": settings.internal_links or [],
+        "min_internal_links": settings.min_internal_links,
+        "max_internal_links": settings.max_internal_links,
         "next_generation": next_gen
     }
     
@@ -7561,7 +7575,13 @@ async def generate_automated_article_with_settings(site: dict, user_id: str, set
     site_id = site.get("id")
     site_name = site.get("site_name", site.get("site_url", "Site"))
     site_url = site.get("site_url", "").lower()
+    
+    # Get notification email - fallback to user email from DB
     notification_email = site.get("notification_email", "")
+    if not notification_email:
+        # Try to get user's email from users collection
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+        notification_email = user_doc.get("email", "") if user_doc else ""
     
     # ALL articles in Romanian - focusing on Romania market
     article_language = "ro"
