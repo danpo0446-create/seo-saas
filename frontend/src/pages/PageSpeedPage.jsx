@@ -5,7 +5,6 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
@@ -24,13 +23,11 @@ import {
   Monitor,
   RefreshCw,
   Loader2,
-  Zap,
   Search,
   Eye,
   Shield,
   AlertTriangle,
   CheckCircle2,
-  Wrench,
   TrendingUp,
   Globe
 } from 'lucide-react';
@@ -93,7 +90,6 @@ const PageSpeedPage = () => {
   
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [optimizing, setOptimizing] = useState(false);
   const [latestAnalysis, setLatestAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyPeriod, setHistoryPeriod] = useState('30');
@@ -174,33 +170,6 @@ const PageSpeedPage = () => {
       }
     } finally {
       setAnalyzing(false);
-    }
-  };
-  
-  const handleOptimize = async (fixType = 'all') => {
-    if (!currentSite?.id) {
-      toast.error('Selectează un site mai întâi');
-      return;
-    }
-    
-    setOptimizing(true);
-    try {
-      const response = await axios.post(
-        `${API}/pagespeed/optimize/${currentSite.id}?fix_type=${fixType}`,
-        {},
-        { headers: getAuthHeaders() }
-      );
-      const { successful, total, results } = response.data;
-      
-      if (successful > 0) {
-        toast.success(`${successful}/${total} plugin-uri instalate cu succes!`);
-      } else {
-        toast.warning('Nu s-au putut instala plugin-urile. Verifică credențialele WordPress.');
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Eroare la optimizare');
-    } finally {
-      setOptimizing(false);
     }
   };
   
@@ -337,34 +306,14 @@ const PageSpeedPage = () => {
                   {/* Recommendations */}
                   <Card className="bg-card border-border">
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                            Recomandări de Optimizare
-                          </CardTitle>
-                          <CardDescription>
-                            {recommendations.filter(r => r.auto_fixable).length} probleme pot fi rezolvate automat
-                          </CardDescription>
-                        </div>
-                        <Button
-                          onClick={() => handleOptimize('all')}
-                          disabled={optimizing}
-                          className="bg-green-600 hover:bg-green-700"
-                          data-testid="optimize-all-btn"
-                        >
-                          {optimizing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Se optimizează...
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="w-4 h-4 mr-2" />
-                              Optimizează Tot
-                            </>
-                          )}
-                        </Button>
+                      <div>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                          Probleme Prioritare
+                        </CardTitle>
+                        <CardDescription>
+                          Top 5 probleme cu cel mai mare impact asupra performanței
+                        </CardDescription>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -375,24 +324,21 @@ const PageSpeedPage = () => {
                             <p>Felicitări! Nu există probleme majore de performanță.</p>
                           </div>
                         ) : (
-                          recommendations.map((rec, idx) => (
+                          recommendations
+                            .sort((a, b) => a.score - b.score) // Lowest score = highest priority
+                            .slice(0, 5) // Only top 5
+                            .map((rec, idx) => (
                             <div
                               key={rec.id || idx}
                               className={`p-4 rounded-lg border ${getScoreBgColor(rec.score)}`}
                             >
-                              <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-4">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className={`font-medium ${getScoreColor(rec.score)}`}>
                                       {rec.score}%
                                     </span>
                                     <h4 className="font-medium">{rec.title}</h4>
-                                    {rec.auto_fixable && (
-                                      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                                        <Wrench className="w-3 h-3 mr-1" />
-                                        Auto-fix
-                                      </Badge>
-                                    )}
                                   </div>
                                   {rec.display_value && (
                                     <p className="text-sm text-muted-foreground">{rec.display_value}</p>
@@ -403,18 +349,6 @@ const PageSpeedPage = () => {
                                     </p>
                                   )}
                                 </div>
-                                {rec.auto_fixable && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleOptimize(rec.fix_type)}
-                                    disabled={optimizing}
-                                    className="shrink-0"
-                                  >
-                                    <Wrench className="w-3 h-3 mr-1" />
-                                    Fix
-                                  </Button>
-                                )}
                               </div>
                             </div>
                           ))
@@ -466,59 +400,75 @@ const PageSpeedPage = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#666"
-                      tick={{ fill: '#999', fontSize: 11 }}
-                      interval={Math.floor(chartData.length / 7)}
-                    />
-                    <YAxis 
-                      domain={[0, 100]}
-                      stroke="#666"
-                      tick={{ fill: '#999', fontSize: 11 }}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1a1a1a', 
-                        border: '1px solid #333',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone"
-                      dataKey="performance_mobile"
-                      name="Performance (Mobile)"
-                      stroke="#22c55e"
-                      strokeWidth={2}
-                      dot={false}
-                      connectNulls={true}
-                    />
-                    <Line 
-                      type="monotone"
-                      dataKey="performance_desktop"
-                      name="Performance (Desktop)"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={false}
-                      connectNulls={true}
-                    />
-                    <Line 
-                      type="monotone"
-                      dataKey="seo_mobile"
-                      name="SEO (Mobile)"
-                      stroke="#eab308"
-                      strokeWidth={2}
-                      dot={false}
-                      connectNulls={true}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {history.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Nicio analiză în această perioadă.</p>
+                    <p className="text-sm">Rulează o analiză pentru a vedea evoluția.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData.filter(d => d.performance_mobile !== null || d.performance_desktop !== null)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#888"
+                        tick={{ fill: '#aaa', fontSize: 12 }}
+                      />
+                      <YAxis 
+                        domain={[0, 100]}
+                        stroke="#888"
+                        tick={{ fill: '#aaa', fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1a1a1a', 
+                          border: '1px solid #444',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '10px' }}
+                      />
+                      <Line 
+                        type="monotone"
+                        dataKey="performance_mobile"
+                        name="Performance Mobile"
+                        stroke="#22c55e"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 8, fill: '#22c55e', stroke: '#fff', strokeWidth: 2 }}
+                        connectNulls={true}
+                      />
+                      <Line 
+                        type="monotone"
+                        dataKey="performance_desktop"
+                        name="Performance Desktop"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 8, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                        connectNulls={true}
+                      />
+                      <Line 
+                        type="monotone"
+                        dataKey="seo_mobile"
+                        name="SEO Mobile"
+                        stroke="#eab308"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#eab308', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 8, fill: '#eab308', stroke: '#fff', strokeWidth: 2 }}
+                        connectNulls={true}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
