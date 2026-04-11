@@ -7264,6 +7264,9 @@ async def get_all_site_automation_settings(user: dict = Depends(get_current_user
                 "include_product_links": False,
                 "product_links_source": "",
                 "max_product_links": 3,
+                "internal_links": [],
+                "min_internal_links": 2,
+                "max_internal_links": 5,
                 "last_generation": None,
                 "next_generation": None,
                 "articles_generated": 0
@@ -7271,6 +7274,14 @@ async def get_all_site_automation_settings(user: dict = Depends(get_current_user
             await db.site_automation_settings.insert_one(settings)
             # Remove _id added by MongoDB
             settings.pop("_id", None)
+        else:
+            # Ensure internal_links fields exist for older records
+            if "internal_links" not in settings:
+                settings["internal_links"] = []
+            if "min_internal_links" not in settings:
+                settings["min_internal_links"] = 2
+            if "max_internal_links" not in settings:
+                settings["max_internal_links"] = 5
         
         result.append({
             "site": site,
@@ -7379,6 +7390,9 @@ async def get_site_automation_settings(site_id: str, user: dict = Depends(get_cu
             "include_product_links": False,
             "product_links_source": "",
             "max_product_links": 3,
+            "internal_links": [],
+            "min_internal_links": 2,
+            "max_internal_links": 5,
             "last_generation": None,
             "next_generation": None,
             "articles_generated": 0
@@ -7386,6 +7400,14 @@ async def get_site_automation_settings(site_id: str, user: dict = Depends(get_cu
         await db.site_automation_settings.insert_one(settings)
         # Remove _id added by MongoDB
         settings.pop("_id", None)
+    else:
+        # Ensure internal_links fields exist for older records
+        if "internal_links" not in settings:
+            settings["internal_links"] = []
+        if "min_internal_links" not in settings:
+            settings["min_internal_links"] = 2
+        if "max_internal_links" not in settings:
+            settings["max_internal_links"] = 5
     
     return {"site": site, "automation": settings}
 
