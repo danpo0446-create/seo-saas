@@ -67,17 +67,21 @@ Collections:
 
 ### Date: 2026-04-11 (Latest)
 
-#### Backend Refactoring - Phase 1 ✅
-- **REFACTORED** Extracted modular routes from `server.py` (~436 lines moved)
+#### Backend Refactoring - Phase 1 & 2 ✅
+- **REFACTORED** Extracted modular routes from `server.py` (~639 lines moved)
 - **NEW** `/app/backend/routes/` directory with modular route handlers
-- **NEW** `routes/pagespeed.py` - PageSpeed Insights routes (326 lines)
-- **NEW** `routes/dashboard.py` - Dashboard statistics routes (125 lines)
-- **NEW** `routes/settings.py` - User settings routes (71 lines)
-- **NEW** `routes/auth.py` - Authentication routes (118 lines)
+- **Phase 1:**
+  - `routes/pagespeed.py` (326 lines) - PageSpeed Insights
+  - `routes/dashboard.py` (125 lines) - Dashboard statistics  
+  - `routes/settings.py` (71 lines) - User settings
+  - `routes/auth.py` (118 lines) - Authentication helpers
+- **Phase 2:**
+  - `routes/notifications.py` (72 lines) - User notifications CRUD
+  - `routes/trends.py` (67 lines) - Google Trends integration
+  - `routes/templates.py` (142 lines) - Article templates CRUD
 - **NEW** `database.py` - MongoDB connection module
-- **NEW** `config.py` - Configuration and constants
-- **REDUCED** `server.py` from ~10111 to ~9675 lines
-- Routes `calendar.py` and `keywords.py` created but not integrated (circular dependencies with `get_user_llm_key`)
+- **NEW** `config.py` - Configuration constants
+- **REDUCED** `server.py` from ~10111 to ~9472 lines
 
 ### Date: 2026-04-03
 
@@ -239,10 +243,10 @@ Collections:
 - ✅ Admin password reset for users
 - ✅ Facebook Page Selection UI
 - ✅ Scheduler reliability improvements (misfire_grace_time, daily recovery)
-- ✅ Backend refactoring Phase 1 (routes/pagespeed, routes/dashboard, routes/settings)
+- ✅ Backend refactoring Phase 1 & 2 (pagespeed, dashboard, settings, notifications, trends, templates)
 
 ### P1 (High) - Pending
-- [ ] Backend refactoring Phase 2 (extract articles, backlinks, gsc, social routes)
+- [ ] Backend refactoring Phase 3 (extract articles CRUD, wordpress CRUD - fără LLM)
 - [ ] Verificare email sending reliability (Resend/SendGrid) via BYOAK
 - [ ] Configure production Stripe keys on VPS
 - [ ] Configure RESEND_API_KEY on VPS for email notifications
