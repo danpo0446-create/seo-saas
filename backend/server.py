@@ -544,34 +544,43 @@ class ArticleTemplateResponse(BaseModel):
 async def send_notification_email(to_email: str, subject: str, html_content: str, user_id: str = None):
     """Send email notification using Resend (BYOAK or platform key)"""
     
+    logging.info(f"[EMAIL] Starting send_notification_email to={to_email}, subject={subject[:50]}...")
+    
     email_key = None
     
     # Try BYOAK key first if user_id provided
     if user_id:
-        email_key, _ = await get_user_email_key(user_id, False, to_email)
+        email_key, provider = await get_user_email_key(user_id, False, to_email)
+        logging.info(f"[EMAIL] BYOAK key found={bool(email_key)}, provider={provider}")
     
     # Fallback to platform key
     if not email_key and RESEND_API_KEY:
         email_key = RESEND_API_KEY
+        logging.info(f"[EMAIL] Using platform RESEND_API_KEY")
     
     if not email_key:
-        logging.warning("No email API key configured, skipping email notification")
+        logging.warning("[EMAIL] No email API key configured, skipping email notification")
         return None
     
     try:
         import resend as resend_lib
         resend_lib.api_key = email_key
+        
+        # Use verified domain or Resend's onboarding email
+        from_email = SENDER_EMAIL if SENDER_EMAIL and '@' in SENDER_EMAIL else "onboarding@resend.dev"
+        logging.info(f"[EMAIL] Sending from={from_email} to={to_email}")
+        
         params = {
-            "from": SENDER_EMAIL,
+            "from": from_email,
             "to": [to_email],
             "subject": subject,
             "html": html_content
         }
-        result = await asyncio.to_thread(resend_lib.Emails.send, params)
-        logging.info(f"Email sent to {to_email}: {result.get('id')}")
+        result = resend_lib.Emails.send(params)
+        logging.info(f"[EMAIL] SUCCESS! Email sent to {to_email}: {result}")
         return result
     except Exception as e:
-        logging.error(f"Failed to send email: {str(e)}")
+        logging.error(f"[EMAIL] FAILED to send email: {str(e)}", exc_info=True)
         return None
 
 def create_article_published_email(article_title: str, article_url: str, company_name: str):
