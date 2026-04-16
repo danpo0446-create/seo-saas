@@ -7672,19 +7672,33 @@ IMPORTANT - LINKURI PRODUSE:
     min_links = settings.get("min_internal_links", 2)
     max_links_internal = settings.get("max_internal_links", 5)
     
+    logging.info(f"[AUTOMATION] Site {site_name}: Internal links config - links={internal_links}, min={min_links}, max={max_links_internal}")
+    
     if internal_links and len(internal_links) > 0:
-        links_list = "\n".join([f"- {link}" for link in internal_links])
+        # Build explicit link examples
+        link_examples = []
+        for i, link in enumerate(internal_links[:max_links_internal]):
+            link_examples.append(f'{i+1}. <a href="{link}" target="_blank">text relevant aici</a>')
+        examples_str = "\n".join(link_examples)
+        
         internal_links_instruction = f"""
-OBLIGATORIU - LINKURI INTERNE/BACKLINKS:
-Trebuie să incluzi EXACT între {min_links} și {max_links_internal} linkuri din lista de mai jos, plasate NATURAL în text:
-{links_list}
+!!!!!!!! OBLIGATORIU - LINKURI INTERNE (TREBUIE INCLUSE) !!!!!!!!
+TREBUIE să incluzi MINIM {min_links} și MAXIM {max_links_internal} linkuri din lista de mai jos.
+FĂRĂ ACESTE LINKURI, ARTICOLUL VA FI RESPINS!
 
-REGULI pentru linkuri:
-1. Folosește format: <a href="URL_DIN_LISTĂ" target="_blank">text descriptiv relevant</a>
-2. Textul ancoră trebuie să fie NATURAL și relevant pentru context
-3. NU pune toate linkurile într-un singur loc - distribuie-le în tot articolul
-4. Fiecare link să fie în context relevant pentru pagina țintă
+LISTA DE LINKURI PE CARE TREBUIE SĂ LE INCLUZI:
+{chr(10).join([f'- {link}' for link in internal_links])}
+
+FORMAT EXACT pentru fiecare link:
+{examples_str}
+
+REGULI STRICTE:
+1. Copiază URL-urile EXACT cum sunt în listă (nu le modifica!)
+2. Pune linkurile în secțiuni diferite ale articolului
+3. Textul ancoră trebuie să fie relevant pentru pagina țintă
+4. Verifică că ai inclus minim {min_links} linkuri din listă!
 """
+        logging.info(f"[AUTOMATION] Site {site_name}: Internal links instruction added with {len(internal_links)} links")
     
     # CRITICAL: Force current year - NEVER use 2024 or 2025
     current_year = 2026
@@ -7814,13 +7828,13 @@ Continuă:"""
     
     # Send email notification - ONLY if email_notification setting is enabled
     should_send_email = settings.get("email_notification", True)
-    logging.info(f"[AUTOMATION] Site {site_name}: Email check - should_send={should_send_email}, notification_email={notification_email[:20] if notification_email else 'NONE'}...")
+    logging.info(f"[AUTOMATION] Site {site_name}: Email check - should_send={should_send_email}, to={notification_email or 'NONE'}")
     
     if should_send_email and notification_email:
         try:
             # Get user's email key (BYOAK)
             email_key, email_provider = await get_user_email_key(user_id, False, notification_email)
-            logging.info(f"[AUTOMATION] Site {site_name}: Email key found={bool(email_key)}, provider={email_provider}")
+            logging.info(f"[AUTOMATION] Site {site_name}: Email key found={bool(email_key)}, provider={email_provider}, sender={SENDER_EMAIL}")
             
             if email_key:
                 status_text = "Publicat pe WordPress" if publish_success else "Salvat ca Draft"
@@ -7842,17 +7856,22 @@ Continuă:"""
                 
                 import resend as resend_lib
                 resend_lib.api_key = email_key
+                
+                # Try sending with verified domain or fallback to onboarding@resend.dev
+                from_email = SENDER_EMAIL if SENDER_EMAIL and '@' in SENDER_EMAIL else "onboarding@resend.dev"
+                logging.info(f"[AUTOMATION] Site {site_name}: Sending email from={from_email} to={notification_email}")
+                
                 result = resend_lib.Emails.send({
-                    "from": SENDER_EMAIL,
+                    "from": from_email,
                     "to": notification_email,
                     "subject": f"Articol nou: {title[:50]}",
                     "html": email_html
                 })
-                logging.info(f"[AUTOMATION] Site {site_name}: Email SENT to {notification_email}, result: {result}")
+                logging.info(f"[AUTOMATION] Site {site_name}: Email SENT SUCCESS! Result: {result}")
             else:
-                logging.warning(f"[AUTOMATION] Site {site_name}: No email key configured, skipping notification")
+                logging.warning(f"[AUTOMATION] Site {site_name}: No email key (BYOAK) configured for user, skipping notification")
         except Exception as e:
-            logging.error(f"[AUTOMATION] Site {site_name}: Failed to send email - {str(e)}")
+            logging.error(f"[AUTOMATION] Site {site_name}: EMAIL FAILED - {str(e)}", exc_info=True)
     
     logging.info(f"[AUTOMATION] Site {site_name}: Completed - Article '{title}' (published: {publish_success})")
     return article_doc
