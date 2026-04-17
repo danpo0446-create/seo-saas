@@ -3874,16 +3874,31 @@ async def publish_to_wordpress(article_id: str, site_id: Optional[str] = None, u
             )
             
             # Send email notification if enabled
-            settings = await db.settings.find_one({"user_id": user["id"]}, {"_id": 0})
-            if settings and settings.get("email_notifications", True):
-                company_name = settings.get("company_name", "SEO Automation")
-                email_html = create_article_published_email(article["title"], wp_post_url, company_name)
-                await send_notification_email(
-                    user["email"],
-                    f"✅ Articol publicat: {article['title']}",
-                    email_html,
-                    user["id"]
-                )
+            try:
+                # Check site automation settings first, then global settings
+                site_settings = await db.site_automation_settings.find_one({"site_id": config["id"], "user_id": user["id"]}, {"_id": 0})
+                global_settings = await db.settings.find_one({"user_id": user["id"]}, {"_id": 0})
+                
+                should_send_email = True
+                if site_settings:
+                    should_send_email = site_settings.get("email_notification", True)
+                elif global_settings:
+                    should_send_email = global_settings.get("email_notifications", True)
+                
+                logging.info(f"[PUBLISH] Email notification check: should_send={should_send_email}, user_email={user.get('email', 'NO EMAIL')}")
+                
+                if should_send_email and user.get("email"):
+                    company_name = global_settings.get("company_name", "SEO Automation") if global_settings else "SEO Automation"
+                    email_html = create_article_published_email(article["title"], wp_post_url, company_name)
+                    email_result = await send_notification_email(
+                        user["email"],
+                        f"Articol publicat: {article['title']}",
+                        email_html,
+                        user["id"]
+                    )
+                    logging.info(f"[PUBLISH] Email notification result: {email_result}")
+            except Exception as email_error:
+                logging.error(f"[PUBLISH] Email notification error: {email_error}")
             
             # POST TO SOCIAL MEDIA (Facebook, LinkedIn)
             logging.info(f"[SOCIAL] Starting social media posting for article: {article['title']}")
@@ -7712,6 +7727,18 @@ REGULI STRICTE:
     # CRITICAL: Force current year - NEVER use 2024 or 2025
     current_year = 2026
     
+    # Build system message with internal links INCLUDED
+    internal_links_system = ""
+    if internal_links and len(internal_links) > 0:
+        links_html = []
+        for link in internal_links[:max_links_internal]:
+            links_html.append(f'<a href="{link}" target="_blank">[text relevant]</a>')
+        internal_links_system = f"""
+
+LINKURI OBLIGATORII DE INCLUS ÎN ARTICOL:
+{chr(10).join([f'- {link}' for link in internal_links])}
+MINIM {min_links} linkuri trebuie incluse în articol!"""
+    
     # All articles in Romanian
     chat = LlmChat(
         api_key=api_key,
@@ -7724,7 +7751,8 @@ REGULI STRICTE:
         
         FOARTE IMPORTANT: Anul curent este {current_year}. 
         INTERZIS să menționezi anii 2020, 2021, 2022, 2023, 2024 sau 2025.
-        Folosește DOAR anul {current_year} sau expresii precum "în prezent", "actualmente", "în acest an"."""
+        Folosește DOAR anul {current_year} sau expresii precum "în prezent", "actualmente", "în acest an".
+        {internal_links_system}"""
     ).with_model("gemini", "gemini-2.0-flash")
     
     prompt = f"""Scrie un articol SEO LUNG și DETALIAT în limba ROMÂNĂ.
