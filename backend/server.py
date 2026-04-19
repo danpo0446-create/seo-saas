@@ -109,37 +109,47 @@ async def get_user_llm_key(user_id: str, is_admin: bool = False, user_email: str
 
 # Helper function to get user's email API key (Resend or SendGrid)
 async def get_user_email_key(user_id: str, is_admin: bool = False, user_email: str = ""):
-    """Get email API key - prioritizes user's BYOAK keys. Platform fallback only for admin/test."""
+    """Get email API key - prioritizes user's BYOAK keys."""
     from saas.subscription_service import decrypt_api_key
     
     logging.info(f"[EMAIL-KEY] Looking for email key for user {user_id[:8]}...")
     
+    # Try user_api_keys collection first
     user_keys = await db.user_api_keys.find_one({"user_id": user_id})
     
     if user_keys:
         logging.info(f"[EMAIL-KEY] Found user_api_keys document. resend_key exists: {bool(user_keys.get('resend_key'))}")
         if user_keys.get("resend_key"):
             decrypted_key = decrypt_api_key(user_keys["resend_key"])
-            logging.info(f"[EMAIL-KEY] Decrypted key starts with: {decrypted_key[:10] if decrypted_key else 'EMPTY'}...")
             if decrypted_key and decrypted_key.startswith("re_"):
-                logging.info(f"[EMAIL-KEY] Valid Resend key found!")
+                logging.info(f"[EMAIL-KEY] Valid Resend key found in user_api_keys!")
                 return decrypted_key, "resend"
-            else:
-                logging.warning(f"[EMAIL-KEY] Resend key invalid or decryption failed")
         if user_keys.get("sendgrid_key"):
             decrypted_key = decrypt_api_key(user_keys["sendgrid_key"])
             if decrypted_key:
                 logging.info(f"[EMAIL-KEY] Valid SendGrid key found!")
                 return decrypted_key, "sendgrid"
-    else:
-        logging.warning(f"[EMAIL-KEY] No user_api_keys document found for user {user_id[:8]}")
     
-    # Fallback to platform key ONLY for admin or test users
-    is_test_user = "test" in user_email.lower() if user_email else False
-    if is_admin or is_test_user:
-        if RESEND_API_KEY:
-            logging.info(f"[EMAIL-KEY] Using platform fallback key")
-            return RESEND_API_KEY, "resend"
+    # Try api_keys collection (alternative location)
+    api_keys = await db.api_keys.find_one({"user_id": user_id})
+    if api_keys:
+        logging.info(f"[EMAIL-KEY] Found api_keys document. resend_key exists: {bool(api_keys.get('resend_key'))}")
+        if api_keys.get("resend_key"):
+            # May not be encrypted in this collection
+            key = api_keys["resend_key"]
+            if isinstance(key, str) and key.startswith("re_"):
+                logging.info(f"[EMAIL-KEY] Valid Resend key found in api_keys!")
+                return key, "resend"
+            else:
+                decrypted_key = decrypt_api_key(key)
+                if decrypted_key and decrypted_key.startswith("re_"):
+                    logging.info(f"[EMAIL-KEY] Valid Resend key found in api_keys (decrypted)!")
+                    return decrypted_key, "resend"
+    
+    # Fallback to platform key for ALL users (not just admin/test)
+    if RESEND_API_KEY:
+        logging.info(f"[EMAIL-KEY] Using platform fallback RESEND_API_KEY")
+        return RESEND_API_KEY, "resend"
     
     logging.warning(f"[EMAIL-KEY] No email key found for user {user_id[:8]}")
     return None, None
