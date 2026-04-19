@@ -3870,6 +3870,8 @@ async def publish_to_wordpress(article_id: str, site_id: Optional[str] = None, u
             wp_post_id = wp_data.get("id")
             wp_post_url = wp_data.get("link", "")
             
+            logging.info(f"[PUBLISH] WordPress post created: id={wp_post_id}, url={wp_post_url}")
+            
             await db.articles.update_one(
                 {"id": article_id},
                 {"$set": {
