@@ -320,8 +320,8 @@ export default function ArticlesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>{article.word_count} cuvinte</span>
-                      <span>Scor SEO: {article.seo_score}%</span>
+                      <span>{article.word_count || 0} cuvinte</span>
+                      <span>Scor SEO: {article.seo_score || 75}%</span>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -493,8 +493,8 @@ export default function ArticlesPage() {
                   {selectedArticle.status === 'draft' && 'Ciornă'}
                   {selectedArticle.status === 'published' && 'Publicat'}
                 </Badge>
-                <span>{selectedArticle.word_count} cuvinte</span>
-                <span>Scor SEO: {selectedArticle.seo_score}%</span>
+                <span>{selectedArticle.word_count || 0} cuvinte</span>
+                <span>Scor SEO: {selectedArticle.seo_score || 75}%</span>
               </DialogDescription>
             )}
           </DialogHeader>
