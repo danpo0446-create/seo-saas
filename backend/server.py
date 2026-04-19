@@ -680,6 +680,36 @@ async def health_check():
             "error": str(e)
         }
 
+@api_router.post("/test-email")
+async def test_email(user: dict = Depends(get_current_user)):
+    """Test endpoint to verify email sending works"""
+    recipient = user.get("email") or "martechassistance@gmail.com"
+    
+    logging.info(f"[TEST-EMAIL] Testing email to {recipient}")
+    
+    # Get email key
+    email_key, provider = await get_user_email_key(user["id"], user.get("role") == "admin", recipient)
+    logging.info(f"[TEST-EMAIL] Email key found: {bool(email_key)}, provider: {provider}")
+    
+    if not email_key:
+        return {"success": False, "error": "No email API key found", "recipient": recipient}
+    
+    try:
+        import resend as resend_lib
+        resend_lib.api_key = email_key
+        
+        result = resend_lib.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": recipient,
+            "subject": "Test Email - SEO Automation",
+            "html": "<h1>Test Email</h1><p>Daca primesti acest email, configuratia Resend functioneaza corect!</p>"
+        })
+        logging.info(f"[TEST-EMAIL] Email sent! Result: {result}")
+        return {"success": True, "result": str(result), "recipient": recipient, "provider": provider}
+    except Exception as e:
+        logging.error(f"[TEST-EMAIL] Error: {str(e)}", exc_info=True)
+        return {"success": False, "error": str(e), "recipient": recipient}
+
 # ============ AUTH ROUTES ============
 
 @api_router.post("/auth/register", response_model=dict)
