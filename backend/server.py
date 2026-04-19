@@ -3885,20 +3885,23 @@ async def publish_to_wordpress(article_id: str, site_id: Optional[str] = None, u
                 elif global_settings:
                     should_send_email = global_settings.get("email_notifications", True)
                 
-                logging.info(f"[PUBLISH] Email notification check: should_send={should_send_email}, user_email={user.get('email', 'NO EMAIL')}")
+                # Get email address - multiple fallbacks
+                recipient_email = user.get("email") or config.get("notification_email") or "martechassistance@gmail.com"
                 
-                if should_send_email and user.get("email"):
+                logging.info(f"[PUBLISH] Email notification: should_send={should_send_email}, to={recipient_email}")
+                
+                if should_send_email and recipient_email:
                     company_name = global_settings.get("company_name", "SEO Automation") if global_settings else "SEO Automation"
                     email_html = create_article_published_email(article["title"], wp_post_url, company_name)
                     email_result = await send_notification_email(
-                        user["email"],
+                        recipient_email,
                         f"Articol publicat: {article['title']}",
                         email_html,
                         user["id"]
                     )
-                    logging.info(f"[PUBLISH] Email notification result: {email_result}")
+                    logging.info(f"[PUBLISH] Email sent to {recipient_email}, result: {email_result}")
             except Exception as email_error:
-                logging.error(f"[PUBLISH] Email notification error: {email_error}")
+                logging.error(f"[PUBLISH] Email notification error: {email_error}", exc_info=True)
             
             # POST TO SOCIAL MEDIA (Facebook, LinkedIn)
             logging.info(f"[SOCIAL] Starting social media posting for article: {article['title']}")
@@ -7622,12 +7625,20 @@ async def generate_automated_article_with_settings(site: dict, user_id: str, set
     site_name = site.get("site_name", site.get("site_url", "Site"))
     site_url = site.get("site_url", "").lower()
     
-    # Get notification email - fallback to user email from DB
+    # Get notification email - try multiple sources
     notification_email = site.get("notification_email", "")
+    if not notification_email:
+        # Try site_automation_settings
+        notification_email = settings.get("notification_email", "")
     if not notification_email:
         # Try to get user's email from users collection
         user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
         notification_email = user_doc.get("email", "") if user_doc else ""
+    if not notification_email:
+        # Hardcoded fallback
+        notification_email = "martechassistance@gmail.com"
+    
+    logging.info(f"[AUTOMATION] Site {site_name}: Notification email will be sent to: {notification_email}")
     
     # ALL articles in Romanian - focusing on Romania market
     article_language = "ro"
@@ -7806,6 +7817,56 @@ Continuă:"""
         word_count = len(re.findall(r'\b\w+\b', content))
     
     seo_score = min(95, 70 + len(keywords) * 5)
+    
+    # POST-PROCESSING: Force correct internal links
+    if internal_links and len(internal_links) > 0:
+        import random
+        
+        # Remove ALL existing <a> tags that are NOT from our list
+        def remove_unwanted_links(html_content):
+            # Keep only links from our internal_links list
+            allowed_domains = set()
+            for link in internal_links:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(link)
+                    allowed_domains.add(parsed.netloc)
+                except:
+                    pass
+            
+            # Remove all <a> tags
+            import re
+            clean_content = re.sub(r'<a[^>]*>([^<]*)</a>', r'\1', html_content)
+            return clean_content
+        
+        content = remove_unwanted_links(content)
+        
+        # Now inject our links at random positions in paragraphs
+        paragraphs = content.split('</p>')
+        links_to_add = internal_links[:max_links_internal]
+        random.shuffle(links_to_add)
+        
+        # Select random paragraphs to inject links (minimum min_links)
+        num_links_to_add = min(len(links_to_add), max_links_internal)
+        num_links_to_add = max(num_links_to_add, min_links)
+        
+        if len(paragraphs) > 1:
+            # Pick paragraphs in the middle of article (not first or last)
+            middle_paragraphs = list(range(1, max(2, len(paragraphs) - 1)))
+            random.shuffle(middle_paragraphs)
+            
+            for i, link in enumerate(links_to_add[:num_links_to_add]):
+                if i < len(middle_paragraphs):
+                    para_idx = middle_paragraphs[i]
+                    if para_idx < len(paragraphs):
+                        # Add link at end of paragraph before </p>
+                        anchor_texts = ["află mai multe", "citește aici", "vezi detalii", "descoperă", "explorează"]
+                        anchor = random.choice(anchor_texts)
+                        link_html = f' <a href="{link}" target="_blank">{anchor}</a>'
+                        paragraphs[para_idx] = paragraphs[para_idx].rstrip() + link_html
+        
+        content = '</p>'.join(paragraphs)
+        logging.info(f"[AUTOMATION] Site {site_name}: Injected {num_links_to_add} internal links into article")
     
     logging.info(f"[AUTOMATION] Site {site_name}: Article generated - '{title}' ({word_count} words)")
     
