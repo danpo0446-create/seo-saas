@@ -4479,10 +4479,10 @@ async def facebook_oauth_callback(
     if error:
         error_msg = error_message or error
         logging.error(f"Facebook OAuth error: {error_msg}")
-        return RedirectResponse(url=f"/wordpress?error={error_msg}")
+        return RedirectResponse(url=f"/app/wordpress?error={error_msg}")
     
     if not code or not state:
-        return RedirectResponse(url=f"/wordpress?error=missing_code_or_state")
+        return RedirectResponse(url=f"/app/wordpress?error=missing_code_or_state")
     
     try:
         user_id, site_id = state.split(":")
@@ -4497,7 +4497,7 @@ async def facebook_oauth_callback(
     fb_app_secret = social_keys["facebook_app_secret"]
     
     if not fb_app_id or not fb_app_secret:
-        return RedirectResponse(url=f"/wordpress?error=facebook_credentials_missing")
+        return RedirectResponse(url=f"/app/wordpress?error=facebook_credentials_missing")
     
     try:
         async with httpx.AsyncClient() as client:
@@ -4514,7 +4514,7 @@ async def facebook_oauth_callback(
             
             if token_response.status_code != 200:
                 logging.error(f"Facebook token error: {token_response.text}")
-                return RedirectResponse(url=f"/wordpress?error=facebook_token_error")
+                return RedirectResponse(url=f"/app/wordpress?error=facebook_token_error")
             
             token_data = token_response.json()
             user_access_token = token_data.get("access_token")
@@ -4548,7 +4548,7 @@ async def facebook_oauth_callback(
             
             if pages_response.status_code != 200:
                 logging.error(f"Facebook pages error: {pages_response.text}")
-                return RedirectResponse(url=f"/wordpress?error=facebook_pages_error")
+                return RedirectResponse(url=f"/app/wordpress?error=facebook_pages_error")
             
             pages_data = pages_response.json()
             pages = pages_data.get("data", [])
@@ -4617,12 +4617,12 @@ async def facebook_oauth_callback(
             
             if not pages:
                 logging.error(f"No Facebook pages found. Full response: {pages_response.text}")
-                return RedirectResponse(url=f"/wordpress?error=no_facebook_pages")
+                return RedirectResponse(url=f"/app/wordpress?error=no_facebook_pages")
             
             # Save pages list for user to select later
             site = await db.wordpress_configs.find_one({"id": site_id, "user_id": user_id})
             if not site:
-                return RedirectResponse(url=f"/wordpress?error=site_not_found")
+                return RedirectResponse(url=f"/app/wordpress?error=site_not_found")
             
             # If only one page, auto-select it
             if len(pages) == 1:
@@ -4635,28 +4635,50 @@ async def facebook_oauth_callback(
                         "facebook_page_name": selected_page.get("name"),
                         "facebook_connected": True,
                         "facebook_connected_at": datetime.now(timezone.utc).isoformat(),
-                        "facebook_pages": pages  # Store all pages for reference
+                        "facebook_pages": pages,
+                        "facebook_pages_pending": False
                     }}
                 )
                 logging.info(f"Facebook auto-connected page '{selected_page.get('name')}' for site {site_id}")
-                return RedirectResponse(url=f"/wordpress?success=facebook_connected")
+                return RedirectResponse(url=f"/app/wordpress?success=facebook_connected")
             
-            # Multiple pages - save all for selection
+            # Multiple pages - check if RECONNECTING (already had a page selected)
+            previous_page_id = site.get("facebook_page_id")
+            if previous_page_id:
+                # Reconnection: find the same page in new pages list and auto-select with new token
+                matching_page = next((p for p in pages if p.get("id") == previous_page_id), None)
+                if matching_page:
+                    await db.wordpress_configs.update_one(
+                        {"id": site_id, "user_id": user_id},
+                        {"$set": {
+                            "facebook_page_token": matching_page.get("access_token"),
+                            "facebook_page_id": matching_page.get("id"),
+                            "facebook_page_name": matching_page.get("name"),
+                            "facebook_connected": True,
+                            "facebook_connected_at": datetime.now(timezone.utc).isoformat(),
+                            "facebook_pages": pages,
+                            "facebook_pages_pending": False
+                        }}
+                    )
+                    logging.info(f"Facebook RECONNECTED - auto-selected same page '{matching_page.get('name')}' for site {site_id}")
+                    return RedirectResponse(url=f"/app/wordpress?success=facebook_connected")
+            
+            # Multiple pages, no previous selection - save all for selection
             await db.wordpress_configs.update_one(
                 {"id": site_id, "user_id": user_id},
                 {"$set": {
                     "facebook_pages": pages,
                     "facebook_user_token": user_access_token,
-                    "facebook_connected": False,  # Not fully connected until page selected
+                    "facebook_connected": False,
                     "facebook_pages_pending": True
                 }}
             )
             logging.info(f"Facebook has {len(pages)} pages - user needs to select one")
-            return RedirectResponse(url=f"/wordpress?success=facebook_pages_loaded&pages={len(pages)}")
+            return RedirectResponse(url=f"/app/wordpress?success=facebook_pages_loaded&pages={len(pages)}")
             
     except Exception as e:
         logging.error(f"Facebook callback error: {str(e)}")
-        return RedirectResponse(url=f"/wordpress?error=facebook_error")
+        return RedirectResponse(url=f"/app/wordpress?error=facebook_error")
 
 
 @api_router.get("/social/facebook/pages/{site_id}")
@@ -4788,10 +4810,10 @@ async def linkedin_oauth_callback(
     # Handle errors from LinkedIn
     if error:
         logging.error(f"LinkedIn OAuth error: {error} - {error_description}")
-        return RedirectResponse(url=f"/wordpress?error=linkedin_{error}")
+        return RedirectResponse(url=f"/app/wordpress?error=linkedin_{error}")
     
     if not code or not state:
-        return RedirectResponse(url=f"/wordpress?error=linkedin_missing_params")
+        return RedirectResponse(url=f"/app/wordpress?error=linkedin_missing_params")
     
     try:
         user_id, site_id = state.split(":")
@@ -4806,7 +4828,7 @@ async def linkedin_oauth_callback(
     linkedin_client_secret = social_keys["linkedin_client_secret"]
     
     if not linkedin_client_id or not linkedin_client_secret:
-        return RedirectResponse(url=f"/wordpress?error=linkedin_credentials_missing")
+        return RedirectResponse(url=f"/app/wordpress?error=linkedin_credentials_missing")
     
     try:
         async with httpx.AsyncClient() as client:
@@ -4825,7 +4847,7 @@ async def linkedin_oauth_callback(
             
             if token_response.status_code != 200:
                 logging.error(f"LinkedIn token error: {token_response.text}")
-                return RedirectResponse(url=f"/wordpress?error=linkedin_token_error")
+                return RedirectResponse(url=f"/app/wordpress?error=linkedin_token_error")
             
             token_data = token_response.json()
             access_token = token_data.get("access_token")
@@ -4847,11 +4869,11 @@ async def linkedin_oauth_callback(
                 logging.info(f"LinkedIn user info: {person_id}, {person_name}")
             else:
                 logging.error(f"LinkedIn userinfo error: {userinfo_response.text}")
-                return RedirectResponse(url=f"/wordpress?error=linkedin_userinfo_error")
+                return RedirectResponse(url=f"/app/wordpress?error=linkedin_userinfo_error")
             
             if not person_id:
                 logging.error("LinkedIn: Could not get person ID")
-                return RedirectResponse(url=f"/wordpress?error=linkedin_no_person_id")
+                return RedirectResponse(url=f"/app/wordpress?error=linkedin_no_person_id")
             
             # Save token to site config (personal profile posting)
             await db.wordpress_configs.update_one(
@@ -4866,11 +4888,11 @@ async def linkedin_oauth_callback(
             )
             
             logging.info(f"LinkedIn connected for site {site_id}, person_id: {person_id}")
-            return RedirectResponse(url=f"/wordpress?success=linkedin_connected")
+            return RedirectResponse(url=f"/app/wordpress?success=linkedin_connected")
         
     except Exception as e:
         logging.error(f"LinkedIn callback error: {str(e)}")
-        return RedirectResponse(url=f"/wordpress?error=linkedin_error")
+        return RedirectResponse(url=f"/app/wordpress?error=linkedin_error")
 
 @api_router.get("/social/status/{site_id}")
 async def get_social_status(site_id: str, user: dict = Depends(get_current_user)):
