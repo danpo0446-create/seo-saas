@@ -683,7 +683,8 @@ async def health_check():
 @api_router.post("/test-email")
 async def test_email(user: dict = Depends(get_current_user)):
     """Test endpoint to verify email sending works"""
-    recipient = user.get("email") or "martechassistance@gmail.com"
+    # Resend test keys can only send to the account owner email
+    recipient = "martechassistance@gmail.com"
     
     logging.info(f"[TEST-EMAIL] Testing email to {recipient}")
     
@@ -3927,8 +3928,8 @@ async def publish_to_wordpress(article_id: str, site_id: Optional[str] = None, u
                 elif global_settings:
                     should_send_email = global_settings.get("email_notifications", True)
                 
-                # Get email address - multiple fallbacks
-                recipient_email = user.get("email") or config.get("notification_email") or "martechassistance@gmail.com"
+                # Get email address - MUST use martechassistance@gmail.com for Resend test key
+                recipient_email = "martechassistance@gmail.com"
                 
                 logging.info(f"[PUBLISH] Email notification: should_send={should_send_email}, to={recipient_email}")
                 
@@ -7667,18 +7668,8 @@ async def generate_automated_article_with_settings(site: dict, user_id: str, set
     site_name = site.get("site_name", site.get("site_url", "Site"))
     site_url = site.get("site_url", "").lower()
     
-    # Get notification email - try multiple sources
-    notification_email = site.get("notification_email", "")
-    if not notification_email:
-        # Try site_automation_settings
-        notification_email = settings.get("notification_email", "")
-    if not notification_email:
-        # Try to get user's email from users collection
-        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
-        notification_email = user_doc.get("email", "") if user_doc else ""
-    if not notification_email:
-        # Hardcoded fallback
-        notification_email = "martechassistance@gmail.com"
+    # Get notification email - MUST be martechassistance@gmail.com for Resend test key
+    notification_email = "martechassistance@gmail.com"
     
     logging.info(f"[AUTOMATION] Site {site_name}: Notification email will be sent to: {notification_email}")
     
