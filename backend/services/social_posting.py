@@ -32,18 +32,30 @@ async def post_to_facebook_page(
         page_access_token: Page-specific access token
         page_id: Facebook Page ID
         message: Post message/description
-        link: URL to share
+        link: URL to share (will be appended to message, not as separate link param)
         image_url: Optional image URL
     
     Returns:
         dict with success status and post_id or error
     """
     try:
+        import re
+        
+        # Clean HTML from message
+        clean_message = re.sub(r'<[^>]+>', '', message)
+        clean_message = re.sub(r'\s+', ' ', clean_message).strip()
+        
+        # Build post text - URL in message body, NOT as separate link parameter
+        # Facebook auto-links URLs in text, but blocks/absorbs separate link param
+        if link:
+            post_text = f"{clean_message}\n\n👇 Citeste articolul complet:\n{link}"
+        else:
+            post_text = clean_message
+        
         async with httpx.AsyncClient() as client:
-            # Post with link
+            # Post WITHOUT link parameter - URL is in message text
             post_data = {
-                "message": message,
-                "link": link,
+                "message": post_text,
                 "access_token": page_access_token
             }
             

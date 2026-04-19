@@ -936,20 +936,29 @@ export default function WordPressPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => testFacebookPost(socialModal.id)}
+                        onClick={() => connectFacebook(socialModal.id)}
                         className="border-blue-500/30 text-blue-500"
-                        data-testid="test-facebook-post-btn"
+                        data-testid="reconnect-facebook-btn"
                       >
-                        Test Post
+                        Reconectează FB
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => testFacebookPost(socialModal.id)}
+                        className="border-green-500/30 text-green-500"
+                        data-testid="test-facebook-post-btn"
+                      >
+                        Test
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => disconnectFacebook(socialModal.id)}
-                        className="text-red-500 border-red-500/30"
+                        className="text-red-500 hover:bg-red-500/10"
                         data-testid="disconnect-facebook-btn"
                       >
-                        Deconectează
+                        X
                       </Button>
                     </div>
                   ) : (
